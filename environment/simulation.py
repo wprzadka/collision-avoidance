@@ -1,6 +1,6 @@
 import numpy as np
 import pygame as pg
-from agent import Agent
+from agents import Agents
 
 
 class Simulation:
@@ -12,33 +12,34 @@ class Simulation:
 
     def initialize(
             self,
-            agents: np.ndarray,
+            agents: Agents,
             targets: np.ndarray
     ):
         self.agents = agents
-        for a, t in zip(agents, targets):
-            a.set_target(t)
+        # for a, t in zip(agents, targets):
+        #     a.set_target(t)
+        agents.set_targets(targets)
 
-    def random_initialize(
-            self,
-            scene_size: tuple,
-            agents_num: int,
-            max_speed: float = 40.,
-            radius: float = 8.,
-    ):
-        width, height = scene_size
-        positions = self.get_random_points(agents_num, width, height)
-        self.agents = [
-            Agent(
-                pos=pos,
-                rad=radius,
-                max_speed=max_speed
-            )
-            for pos in positions
-        ]
-        targets = self.get_random_points(agents_num, width, height)
-        for a, t in zip(self.agents, targets):
-            a.set_target(t)
+    # def random_initialize(
+    #         self,
+    #         scene_size: tuple,
+    #         agents_num: int,
+    #         max_speed: float = 40.,
+    #         radius: float = 8.,
+    # ):
+    #     width, height = scene_size
+    #     positions = self.get_random_points(agents_num, width, height)
+    #     self.agents = [
+    #         Agent(
+    #             pos=pos,
+    #             rad=radius,
+    #             max_speed=max_speed
+    #         )
+    #         for pos in positions
+    #     ]
+    #     targets = self.get_random_points(agents_num, width, height)
+    #     for a, t in zip(self.agents, targets):
+    #         a.set_target(t)
 
     def start(self):
         self.running = True
@@ -53,19 +54,20 @@ class Simulation:
     def update(self, win: pg.display):
         dt = 1 / 60.
         self.last_update_time = pg.time
-        for a in self.agents:
-            a.move(dt)
+        self.agents.move(dt)
+        for pos, rad in zip(self.agents.positions, self.agents.radiuses):
             pg.draw.circle(
                 win,
                 (0, 125, 200),
-                [int(v) for v in a.position],
-                int(a.radius),
+                [int(v) for v in pos],
+                int(rad),
                 1
             )
+        for target in self.agents.targets:
             pg.draw.circle(
                 win,
                 (200, 50, 50),
-                [int(v) for v in a.target],
+                [int(v) for v in target],
                 1,
                 1
             )
@@ -80,10 +82,16 @@ if __name__ == '__main__':
     sim = Simulation()
     # sim.random_initialize(scene_size=win_size, agents_num=10)
 
-    agents = np.array([
-        Agent(np.array([100, 200]), 20, 40),
-        Agent(np.array([400, 200]), 20, 40)
-    ])
+    agents = Agents(
+        agents_num=2,
+        positions=np.array([
+            [100, 200],
+            [400, 200]
+        ]),
+        radiuses=np.array([20, 20]),
+        max_speeds=np.array([20, 20]),
+        desired_speeds=np.array([15, 15])
+    )
     targets = np.array([
         [400, 200],
         [100, 200]
