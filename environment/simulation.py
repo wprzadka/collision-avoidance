@@ -17,30 +17,7 @@ class Simulation:
             targets: np.ndarray
     ):
         self.agents = agents
-        # for a, t in zip(agents, targets):
-        #     a.set_target(t)
         agents.set_targets(targets)
-
-    # def random_initialize(
-    #         self,
-    #         scene_size: tuple,
-    #         agents_num: int,
-    #         max_speed: float = 40.,
-    #         radius: float = 8.,
-    # ):
-    #     width, height = scene_size
-    #     positions = self.get_random_points(agents_num, width, height)
-    #     self.agents = [
-    #         Agent(
-    #             pos=pos,
-    #             rad=radius,
-    #             max_speed=max_speed
-    #         )
-    #         for pos in positions
-    #     ]
-    #     targets = self.get_random_points(agents_num, width, height)
-    #     for a, t in zip(self.agents, targets):
-    #         a.set_target(t)
 
     def start(self):
         self.running = True
@@ -80,7 +57,7 @@ class Simulation:
             )
         pg.draw.line(
             win,
-            (50, 50, 255),
+            (150, 255, 150),
             agents.positions[agents.debug_agent],
             agents.positions[agents.debug_agent] + agents.velocities[agents.debug_agent]
         )
@@ -98,9 +75,6 @@ if __name__ == '__main__':
     agents = Agents(
         agents_num=4,
         positions=np.array([
-            # [100, 400, 200],
-            # [200, 200, 300]
-
             [100, 200],
             [400, 200],
             [200, 300],
@@ -111,9 +85,6 @@ if __name__ == '__main__':
         desired_speeds=np.full((4, 1), 75)
     )
     targets = np.array([
-        # [400, 200, 500],
-        # [500, 500, 400]
-
         [400, 500],
         [200, 500],
         [500, 400],
@@ -134,7 +105,7 @@ if __name__ == '__main__':
                 sim.running = False
 
         rvo.compute_vo(agents.positions, agents.velocities, agents.radiuses)
-        rvo.draw_debug(window, 0)
+        rvo.draw_debug(window, agent_idx=agents.debug_agent)
 
         sim.update(window)
 
