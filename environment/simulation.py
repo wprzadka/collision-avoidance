@@ -30,9 +30,7 @@ class Simulation:
         return np.concatenate((x_positions, y_positions), axis=1)
 
     def update(self, win: pg.display):
-        dt = 1 / 60.
         self.last_update_time = pg.time
-        self.agents.move(dt)
         for i, (pos, rad) in enumerate(zip(self.agents.positions, self.agents.radiuses)):
             color = (20, 255, 20) if i == agents.debug_agent else (20, 145, 220)
             pg.draw.circle(
@@ -61,6 +59,12 @@ class Simulation:
             agents.positions[agents.debug_agent],
             agents.positions[agents.debug_agent] + agents.velocities[agents.debug_agent]
         )
+        pg.draw.line(
+            win,
+            (150, 150, 255),
+            agents.positions[agents.debug_agent],
+            agents.positions[agents.debug_agent] + agents.preferred_velocities[agents.debug_agent]
+        )
 
 
 if __name__ == '__main__':
@@ -75,20 +79,21 @@ if __name__ == '__main__':
     agents = Agents(
         agents_num=4,
         positions=np.array([
-            [100, 200],
-            [400, 200],
-            [200, 300],
-            [150, 400]
+            [100., 200.],
+            [400., 200.],
+            [200., 300.],
+            [400., 500.]
         ]),
         radiuses=np.full((4, 1), 10),
-        max_speeds=np.full((4, 1), 100),
-        desired_speeds=np.full((4, 1), 75)
+        max_speeds=np.full((4, 1), 100.),
+        desired_speeds=np.full((4, 1), 75.),
+        velocity_diff_range=np.full((4, 1), 10.)
     )
     targets = np.array([
-        [400, 500],
-        [200, 500],
-        [500, 400],
-        [150, 100]
+        [400., 500.],
+        [200., 500.],
+        [500., 400.],
+        [100., 200.]
     ])
     sim.initialize(agents, targets)
     rvo = ReciprocalVelocityObstacle(agents_num=agents.agents_num)
@@ -96,6 +101,7 @@ if __name__ == '__main__':
     sim.start()
     clock = pg.time.Clock()
 
+    delta_time = 1 / 60.
     while sim.running:
         clock.tick(60)
         window.fill((60, 60, 60))
@@ -105,8 +111,20 @@ if __name__ == '__main__':
                 sim.running = False
 
         rvo.compute_vo(agents.positions, agents.velocities, agents.radiuses)
+        new_velocities = rvo.compute_velocities(
+            agents.positions,
+            agents.velocities,
+            agents.get_preferred_velocities(),
+            agents.max_speeds,
+            agents.velocity_diff_range,
+            agents.radiuses,
+            200
+        )
         rvo.draw_debug(window, agent_idx=agents.debug_agent)
 
+        # print(agents.get_preferred_velocities() - new_velocities)
+        agents.set_velocity(new_velocities)
+        agents.move(delta_time)
         sim.update(window)
 
         pg.display.update()
