@@ -6,12 +6,11 @@ from matplotlib.patches import Polygon
 
 class ReciprocalVelocityObstacle:
 
-    def __init__(self, agents_num):
+    def __init__(self, agents_num: int, reciprocal: bool = False):
+        self.reciprocal = reciprocal
         self.centers = np.empty([agents_num, agents_num - 1, 2])
-
         self.left_boundaries = np.empty([agents_num, agents_num - 1, 2])
         self.right_boundaries = np.empty([agents_num, agents_num - 1, 2])
-
         self.left_normals = None
         self.right_normals = None
 
@@ -23,14 +22,15 @@ class ReciprocalVelocityObstacle:
     ):
         idx = 0
         while idx < radiuses.size:
-            pos = positions[idx]
+            agent_pos = positions[idx]
+            agent_vel = velocities[idx]
 
             vels = np.delete(velocities, idx, axis=0)
             rads = np.delete(radiuses, idx, axis=0) + radiuses[idx]
             points = np.delete(positions, idx, axis=0)
 
-            self.centers[idx] = pos + vels
-            ref_points = pos - points
+            self.centers[idx] = agent_pos + (vels if not self.reciprocal else (vels + agent_vel) / 2)
+            ref_points = agent_pos - points
 
             sqr_dist = np.square(np.linalg.norm(ref_points))
             sqr_rad = np.square(rads)

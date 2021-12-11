@@ -96,7 +96,7 @@ if __name__ == '__main__':
         [100., 200.]
     ])
     sim.initialize(agents, targets)
-    rvo = ReciprocalVelocityObstacle(agents_num=agents.agents_num)
+    rvo = ReciprocalVelocityObstacle(agents_num=agents.agents_num, reciprocal=True)
 
     sim.start()
     clock = pg.time.Clock()
