@@ -32,8 +32,15 @@ class Agents:
     def get_preferred_velocities(self):
         self.preferred_velocities = self.targets - self.positions
         norms = np.linalg.norm(self.preferred_velocities, axis=1).reshape((-1, 1))
-        norms[norms < 1] = 1.
-        self.preferred_velocities = self.preferred_velocities / norms * self.desired_speeds
+
+        condition = norms > 1.
+
+        multipliers = np.empty_like(self.desired_speeds)
+        multipliers[~condition] = 0.
+        multipliers[condition] = self.desired_speeds[condition] / norms[condition]
+
+        self.preferred_velocities = self.preferred_velocities * multipliers
+
         return self.preferred_velocities
 
     def set_targets(self, targets: np.ndarray):
