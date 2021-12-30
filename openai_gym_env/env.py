@@ -17,18 +17,14 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             agents_num: int,
             visible_agents_num: int,
             max_speed: float,
-            win_size: tuple = None
+            win_size: tuple = (1200, 900)
     ):
         super(CollisionAvoidanceEnv, self).__init__()
 
         self.max_agents_speed = max_speed
         self.agents_num = agents_num
         self.visible_agents_num = visible_agents_num
-
-        # rendering
-        self.window = pg.display.set_mode(win_size) if win_size else pg.display.set_mode()
-        self.win_size = pg.display.get_surface().get_size()
-        pg.display.set_caption("Collision Avoidance")
+        self.win_size = win_size
 
         self.action_space = spaces.Box(
             shape=(2,),
@@ -50,29 +46,27 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         })
         # simulation
         self.simulation = Simulation()
-        self.initialize_simulation(agents_num, pg.display.get_surface().get_size())
+        self.initialize_simulation()
         self.time = 0
+        # rendering
+        self.window = None
 
-    def initialize_simulation(
-            self,
-            agents_num: int,
-            win_size: tuple
-    ):
+    def initialize_simulation(self):
         agents = Agents(
-            agents_num=agents_num,
-            positions=np.random.rand(agents_num, 2) * win_size,
+            agents_num=self.agents_num,
+            positions=np.random.rand(self.agents_num, 2) * self.win_size,
             # positions=np.array([
             #     [100., 200.],
             #     [400., 200.],
             #     [200., 300.],
             #     [400., 500.]
             # ]),
-            radiuses=np.full((agents_num, 1), 10),
-            max_speeds=np.full((agents_num, 1), self.max_agents_speed),
-            desired_speeds=np.full((agents_num, 1), 0.75 * self.max_agents_speed),
-            velocity_diff_range=np.full((agents_num, 1), 10.)
+            radiuses=np.full((self.agents_num, 1), 10),
+            max_speeds=np.full((self.agents_num, 1), self.max_agents_speed),
+            desired_speeds=np.full((self.agents_num, 1), 0.75 * self.max_agents_speed),
+            velocity_diff_range=np.full((self.agents_num, 1), 10.)
         )
-        targets = np.random.rand(agents_num, 2) * win_size
+        targets = np.random.rand(self.agents_num, 2) * self.win_size
         # targets = np.array([
         #     [400., 500.],
         #     [200., 500.],
@@ -101,15 +95,14 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
 
     def reset(self):
         self.time = 0
-        self.initialize_simulation(self.agents_num, pg.display.get_surface().get_size())
+        self.initialize_simulation()
         return self.get_observations()
 
     def render(self, mode='human', close=False):
-        # if mode == 'human':
-        #     if not self.window:
-        #         win_size = (1200, 900)
-        #         self.window = pg.display.set_mode(win_size)
-        #         pg.display.set_caption("Collision Avoidance")
+        if mode == 'human':
+            if not self.window:
+                self.window = pg.display.set_mode(self.win_size)
+                pg.display.set_caption("Collision Avoidance")
         self.window.fill((60, 60, 60))
         self.simulation.update(self.window)
         pg.display.update()
@@ -122,7 +115,6 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         visible_positions = self.simulation.agents.positions[1: self.visible_agents_num + 1]
         visible_velocities = self.simulation.agents.velocities[1: self.visible_agents_num + 1]
         # assert all([all(a < b) for a, b in zip(visible_velocities, self.observation_space['velocity'].high)])
-        print(visible_velocities)
         return {
             'velocity': visible_velocities,
             'position': visible_positions,
@@ -143,7 +135,7 @@ if __name__ == '__main__':
         t = 0
         while not done:
             env.render()
-            observation, reward, done, _ = env.step(None)
+            observation, reward, done, _ = env.step([0, 0])
             current_total_reward += reward
             t += 1
 
