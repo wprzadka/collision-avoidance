@@ -12,34 +12,52 @@ from environment.agents import Agents
 class CollisionAvoidanceEnv(gym.Env, ABC):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, agents_num: int, visible_agents_num: int, max_speed: float):
+    def __init__(
+            self,
+            agents_num: int,
+            visible_agents_num: int,
+            max_speed: float,
+            win_size: tuple = None
+    ):
         super(CollisionAvoidanceEnv, self).__init__()
 
         self.max_agents_speed = max_speed
         self.agents_num = agents_num
         self.visible_agents_num = visible_agents_num
 
-        self.action_space = spaces.Box(
-            shape=2,
-            low=-max_speed,
-            high=max_speed
-        )
-
-        self.observation_space = spaces.Box(
-            shape=(visible_agents_num, 2, 2),
-            low=-max_speed,
-            high=max_speed
-        )
-
         # rendering
-        self.window = pg.display.set_mode()
+        self.window = pg.display.set_mode(win_size) if win_size else pg.display.set_mode()
+        self.win_size = pg.display.get_surface().get_size()
         pg.display.set_caption("Collision Avoidance")
+
+        self.action_space = spaces.Box(
+            shape=(2,),
+            low=-max_speed,
+            high=max_speed
+        )
+
+        self.observation_space = spaces.Dict({
+            'velocity': spaces.Box(
+                shape=(visible_agents_num, 2),
+                low=-max_speed,
+                high=max_speed
+            ),
+            'position': spaces.Box(
+                shape=(visible_agents_num, 2),
+                low=np.zeros((visible_agents_num, 2)),
+                high=np.full((visible_agents_num, 2), fill_value=self.win_size)
+            ),
+        })
         # simulation
         self.simulation = Simulation()
         self.initialize_simulation(agents_num, pg.display.get_surface().get_size())
         self.time = 0
 
-    def initialize_simulation(self, agents_num: int, win_size: tuple):
+    def initialize_simulation(
+            self,
+            agents_num: int,
+            win_size: tuple
+    ):
         agents = Agents(
             agents_num=agents_num,
             positions=np.random.rand(agents_num, 2) * win_size,
@@ -50,8 +68,8 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             #     [400., 500.]
             # ]),
             radiuses=np.full((agents_num, 1), 10),
-            max_speeds=np.full((agents_num, 1), 100.),
-            desired_speeds=np.full((agents_num, 1), 75.),
+            max_speeds=np.full((agents_num, 1), self.max_agents_speed),
+            desired_speeds=np.full((agents_num, 1), 0.75 * self.max_agents_speed),
             velocity_diff_range=np.full((agents_num, 1), 10.)
         )
         targets = np.random.rand(agents_num, 2) * win_size
@@ -68,29 +86,30 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
 
         new_velocities = self.simulation.agents.get_preferred_velocities()
         self.simulation.agents.set_velocity(new_velocities)
-        self.simulation.agents.velocities[0] = np.zeros(2)
+        # override 1st agent velocity with action
+        self.simulation.agents.velocities[0] = action
         self.simulation.agents.move(0.01)
 
-        visible_positions = self.simulation.agents.positions[1: self.visible_agents_num + 1]
-        visible_velocities = self.simulation.agents.velocities[1: self.visible_agents_num + 1]
-        observation = np.stack([visible_positions, visible_velocities], axis=1)
-
+        # observation
+        obs = self.get_observations()
+        # reward
         distance = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
         reward = -distance
 
-        # observation, reward, done, debug
-        return observation, reward, self.time > 1000, None
+        # observation, reward, done, info
+        return obs, reward, self.time > 1000, {}
 
     def reset(self):
         self.time = 0
         self.initialize_simulation(self.agents_num, pg.display.get_surface().get_size())
+        return self.get_observations()
 
     def render(self, mode='human', close=False):
-        if mode == 'human':
-            if not self.window:
-                win_size = (1200, 900)
-                self.window = pg.display.set_mode(win_size)
-                pg.display.set_caption("Collision Avoidance")
+        # if mode == 'human':
+        #     if not self.window:
+        #         win_size = (1200, 900)
+        #         self.window = pg.display.set_mode(win_size)
+        #         pg.display.set_caption("Collision Avoidance")
         self.window.fill((60, 60, 60))
         self.simulation.update(self.window)
         pg.display.update()
@@ -98,6 +117,16 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
     def close(self):
         # pg.display.quit()
         super().close()
+
+    def get_observations(self):
+        visible_positions = self.simulation.agents.positions[1: self.visible_agents_num + 1]
+        visible_velocities = self.simulation.agents.velocities[1: self.visible_agents_num + 1]
+        # assert all([all(a < b) for a, b in zip(visible_velocities, self.observation_space['velocity'].high)])
+        print(visible_velocities)
+        return {
+            'velocity': visible_velocities,
+            'position': visible_positions,
+        }
 
 
 if __name__ == '__main__':
