@@ -1,6 +1,6 @@
 import numpy as np
 import pygame as pg
-from agents import Agents
+from environment.agents import Agents
 from VO.ReciprocalVelocityObstacle import ReciprocalVelocityObstacle
 
 
@@ -32,7 +32,7 @@ class Simulation:
     def update(self, win: pg.display):
         self.last_update_time = pg.time
         for i, (pos, rad) in enumerate(zip(self.agents.positions, self.agents.radiuses)):
-            color = (20, 255, 20) if i == agents.debug_agent else (20, 145, 220)
+            color = (20, 255, 20) if i == self.agents.debug_agent else (20, 145, 220)
             pg.draw.circle(
                 win,
                 color,
@@ -56,14 +56,14 @@ class Simulation:
         pg.draw.line(
             win,
             (150, 255, 150),
-            agents.positions[agents.debug_agent],
-            agents.positions[agents.debug_agent] + agents.velocities[agents.debug_agent]
+            self.agents.positions[self.agents.debug_agent],
+            self.agents.positions[self.agents.debug_agent] + self.agents.velocities[self.agents.debug_agent]
         )
         pg.draw.line(
             win,
             (150, 150, 255),
-            agents.positions[agents.debug_agent],
-            agents.positions[agents.debug_agent] + agents.preferred_velocities[agents.debug_agent]
+            self.agents.positions[self.agents.debug_agent],
+            self.agents.positions[self.agents.debug_agent] + self.agents.preferred_velocities[self.agents.debug_agent]
         )
 
 
@@ -76,24 +76,29 @@ if __name__ == '__main__':
     sim = Simulation()
     # sim.random_initialize(scene_size=win_size, agents_num=10)
 
+    agents_num = 6
     agents = Agents(
-        agents_num=4,
+        agents_num=agents_num,
         positions=np.array([
             [100., 200.],
             [400., 200.],
             [200., 300.],
+            [300., 300.],
+            [400., 300.],
             [400., 500.]
         ]),
-        radiuses=np.full((4, 1), 10),
-        max_speeds=np.full((4, 1), 100.),
-        desired_speeds=np.full((4, 1), 75.),
-        velocity_diff_range=np.full((4, 1), 10.)
+        radiuses=np.full((agents_num, 1), 10),
+        max_speeds=np.full((agents_num, 1), 100.),
+        desired_speeds=np.full((agents_num, 1), 75.),
+        velocity_diff_range=np.full((agents_num, 1), 10.)
     )
     targets = np.array([
         [400., 500.],
         [200., 500.],
         [500., 400.],
-        [100., 200.]
+        [100., 250.],
+        [700., 260.],
+        [140., 200.]
     ])
     sim.initialize(agents, targets)
     rvo = ReciprocalVelocityObstacle(agents_num=agents.agents_num, reciprocal=True)
