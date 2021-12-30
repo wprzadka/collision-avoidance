@@ -46,12 +46,12 @@ class Simulation:
                 int(rad),
                 1
             )
-        for target in self.agents.targets:
+        for i, target in enumerate(self.agents.targets):
             pg.draw.circle(
                 win,
                 (220, 70, 70),
                 [int(v) for v in target],
-                1
+                4 if i == self.agents.debug_agent else 1
             )
         pg.draw.line(
             win,
