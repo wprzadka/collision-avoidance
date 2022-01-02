@@ -7,17 +7,20 @@ import pygame as pg
 
 from environment.simulation import Simulation
 from environment.agents import Agents
+from VO.ReciprocalVelocityObstacle import ReciprocalVelocityObstacle
 
 
 class CollisionAvoidanceEnv(gym.Env, ABC):
     metadata = {'render.modes': ['human']}
+    available_algorithms = [None, 'VO', 'RVO']
 
     def __init__(
             self,
             agents_num: int,
             visible_agents_num: int,
             max_speed: float,
-            win_size: tuple = (1200, 900)
+            win_size: tuple = (1200, 900),
+            algorithm: str = None
     ):
         super(CollisionAvoidanceEnv, self).__init__()
 
@@ -50,6 +53,26 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.time = 0
         # rendering
         self.window = None
+        # algorithm
+        self.algorithm = None
+        self.get_velocities = None
+
+        if algorithm is None:
+            self.get_velocities = self.simulation.agents.get_preferred_velocities
+        elif algorithm in ['VO', 'RVO']:
+            self.algorithm = ReciprocalVelocityObstacle(self.agents_num, algorithm == 'RVO')
+            self.get_velocities = lambda: self.algorithm.compute_velocities(
+                    self.simulation.agents.positions,
+                    self.simulation.agents.velocities,
+                    self.simulation.agents.get_preferred_velocities(),
+                    self.simulation.agents.max_speeds,
+                    self.simulation.agents.velocity_diff_range,
+                    self.simulation.agents.radiuses,
+                    shoots_num=200
+                )
+        else:
+            raise Exception(f'{algorithm} is not in available algorithms')
+
 
     def initialize_simulation(self):
         agents = Agents(
@@ -91,7 +114,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         reward = -distance
 
         # observation, reward, done, info
-        return obs, reward, self.time > 1000, {}
+        return obs, reward, self.time > 10000, {}
 
     def reset(self):
         self.time = 0
@@ -122,7 +145,13 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
 
 
 if __name__ == '__main__':
-    env = CollisionAvoidanceEnv(5, 3, 10.)
+    env = CollisionAvoidanceEnv(
+        agents_num=20,
+        visible_agents_num=3,
+        max_speed=4.,
+        algorithm='VO',
+        win_size=(600, 600)
+    )
 
     print(f'actions: {env.action_space}')
     print(f'observations: {env.observation_space}')
