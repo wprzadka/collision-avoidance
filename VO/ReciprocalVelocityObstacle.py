@@ -75,6 +75,8 @@ class ReciprocalVelocityObstacle:
             radiuses: np.ndarray,
             shoots_num: int
     ):
+        self.compute_vo(positions, velocities, radiuses)
+
         new_velocities = np.empty_like(velocities)
         for idx, vel in enumerate(velocities):
             points = self.generate_random_points(shoots_num)
