@@ -73,7 +73,6 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         else:
             raise Exception(f'{algorithm} is not in available algorithms')
 
-
     def initialize_simulation(self):
         agents = Agents(
             agents_num=self.agents_num,
@@ -135,8 +134,9 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         super().close()
 
     def get_observations(self):
-        visible_positions = self.simulation.agents.positions[1: self.visible_agents_num + 1]
-        visible_velocities = self.simulation.agents.velocities[1: self.visible_agents_num + 1]
+        nearest_neighbours = self.simulation.agents.get_nearest_neighbours(self.visible_agents_num)[0]
+        visible_positions = self.simulation.agents.positions[nearest_neighbours]
+        visible_velocities = self.simulation.agents.velocities[nearest_neighbours]
         # assert all([all(a < b) for a, b in zip(visible_velocities, self.observation_space['velocity'].high)])
         return {
             'velocity': visible_velocities,
