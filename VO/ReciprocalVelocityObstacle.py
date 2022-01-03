@@ -6,11 +6,16 @@ from matplotlib.patches import Polygon
 
 class ReciprocalVelocityObstacle:
 
-    def __init__(self, agents_num: int, reciprocal: bool = False):
+    def __init__(
+            self,
+            visible_agents_num: int,
+            reciprocal: bool = False
+    ):
+        self.visible_agents_num = visible_agents_num
         self.reciprocal = reciprocal
-        self.centers = np.empty([agents_num, agents_num - 1, 2])
-        self.left_boundaries = np.empty([agents_num, agents_num - 1, 2])
-        self.right_boundaries = np.empty([agents_num, agents_num - 1, 2])
+        self.centers = np.empty([visible_agents_num, visible_agents_num - 1, 2])
+        self.left_boundaries = np.empty([visible_agents_num, visible_agents_num - 1, 2])
+        self.right_boundaries = np.empty([visible_agents_num, visible_agents_num - 1, 2])
         self.left_normals = None
         self.right_normals = None
 
@@ -117,8 +122,8 @@ class ReciprocalVelocityObstacle:
                 agent_idx=agent_idx
             ) for vel in accessible_velocities])
         # multiply by aggressiveness parameter weight
-        for a, b in zip(velocity_cost, 20 / time_to_collision):
-            print(a, b)
+        # for a, b in zip(velocity_cost, 20 / time_to_collision):
+        #     print(a, b)
         return velocity_cost + 20 / time_to_collision
 
     def compute_time_to_collision(

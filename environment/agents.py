@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial import KDTree
 
 
 class Agents:
@@ -22,9 +23,12 @@ class Agents:
         self.preferred_velocities = np.zeros((agents_num, 2))
         self.targets = self.positions.copy()
         self.debug_agent = 0
+        self.quadtree = KDTree(self.positions)
 
     def move(self, delta_time: float):
         self.positions = self.positions + self.velocities * delta_time
+        # update quadtree
+        self.quadtree = KDTree(self.positions)
 
     def set_velocity(self, new_velocities: np.ndarray):
         self.velocities = new_velocities
@@ -45,6 +49,14 @@ class Agents:
 
     def set_targets(self, targets: np.ndarray):
         self.targets = targets
+
+    def get_nearest_neighbours(self, neighbours_num: int):
+        neighbours = np.empty((self.positions.shape[0], neighbours_num))
+        for i, pos in enumerate(self.positions):
+            # ignoring 1st result because it is always index of self
+            _, indices = self.quadtree.query(pos, k=neighbours_num + 1)
+            neighbours[i] = indices[1:]
+        return neighbours
 
 
 if __name__ == '__main__':

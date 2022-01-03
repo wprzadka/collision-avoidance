@@ -53,6 +53,7 @@ class Simulation:
                 [int(v) for v in target],
                 4 if i == self.agents.debug_agent else 1
             )
+
         pg.draw.line(
             win,
             (150, 255, 150),
@@ -65,6 +66,19 @@ class Simulation:
             self.agents.positions[self.agents.debug_agent],
             self.agents.positions[self.agents.debug_agent] + self.agents.preferred_velocities[self.agents.debug_agent]
         )
+
+        nearest = self.agents.get_nearest_neighbours(1)
+        for idx, (pos, neig) in enumerate(list(zip(self.agents.positions, nearest))):
+            neig = int(neig[0])
+            neighbour_pos = self.agents.positions[neig]
+            if np.linalg.norm(pos - neighbour_pos) < self.agents.radiuses[idx] + self.agents.radiuses[neig]:
+                pg.draw.circle(
+                    win,
+                    (255, 0, 0),
+                    [int(v) for v in pos],
+                    int(self.agents.radiuses[idx]),
+                    1
+                )
 
 
 if __name__ == '__main__':
@@ -101,7 +115,7 @@ if __name__ == '__main__':
         [140., 200.]
     ])
     sim.initialize(agents, targets)
-    rvo = ReciprocalVelocityObstacle(agents_num=agents.agents_num, reciprocal=True)
+    rvo = ReciprocalVelocityObstacle(visible_agents_num=agents.agents_num)  # , reciprocal=True)
 
     sim.start()
     clock = pg.time.Clock()
