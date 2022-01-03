@@ -58,20 +58,20 @@ class Simulation:
             win,
             (150, 255, 150),
             self.agents.positions[self.agents.debug_agent],
-            self.agents.positions[self.agents.debug_agent] + self.agents.velocities[self.agents.debug_agent]
+            self.agents.positions[self.agents.debug_agent]
+            + self.agents.velocities[self.agents.debug_agent]
         )
         pg.draw.line(
             win,
             (150, 150, 255),
             self.agents.positions[self.agents.debug_agent],
-            self.agents.positions[self.agents.debug_agent] + self.agents.preferred_velocities[self.agents.debug_agent]
+            self.agents.positions[self.agents.debug_agent]
+            + self.agents.preferred_velocities[self.agents.debug_agent]
         )
 
         nearest = self.agents.get_nearest_neighbours(1)
         for idx, (pos, neig) in enumerate(list(zip(self.agents.positions, nearest))):
-            neig = neig[0]
-            neighbour_pos = self.agents.positions[neig]
-            if np.linalg.norm(pos - neighbour_pos) < self.agents.radiuses[idx] + self.agents.radiuses[neig]:
+            if self.is_colliding(idx, neig[0]):
                 pg.draw.circle(
                     win,
                     (255, 0, 0),
@@ -79,6 +79,10 @@ class Simulation:
                     int(self.agents.radiuses[idx]),
                     1
                 )
+
+    def is_colliding(self, fst: int, snd: int) -> bool:
+        return np.linalg.norm(self.agents.positions[fst] - self.agents.positions[snd]) \
+               < self.agents.radiuses[fst] + self.agents.radiuses[snd]
 
 
 if __name__ == '__main__':
@@ -104,7 +108,7 @@ if __name__ == '__main__':
         radiuses=np.full((agents_num, 1), 10),
         max_speeds=np.full((agents_num, 1), 100.),
         desired_speeds=np.full((agents_num, 1), 75.),
-        velocity_diff_range=np.full((agents_num, 1), 10.)
+        velocity_diff_range=np.full((agents_num, 1), 20.)
     )
     targets = np.array([
         [400., 500.],

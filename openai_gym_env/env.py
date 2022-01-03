@@ -13,6 +13,7 @@ from VO.ReciprocalVelocityObstacle import ReciprocalVelocityObstacle
 class CollisionAvoidanceEnv(gym.Env, ABC):
     metadata = {'render.modes': ['human']}
     available_algorithms = [None, 'VO', 'RVO']
+    collision_penalty = 100.
 
     def __init__(
             self,
@@ -46,6 +47,11 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
                 low=np.zeros((visible_agents_num, 2)),
                 high=np.full((visible_agents_num, 2), fill_value=self.win_size)
             ),
+            'target': spaces.Box(
+                shape=(2,),
+                low=np.zeros(2),
+                high=np.array(self.win_size)
+            )
         })
         # simulation
         self.simulation = Simulation()
@@ -62,14 +68,14 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         elif algorithm in ['VO', 'RVO']:
             self.algorithm = ReciprocalVelocityObstacle(self.agents_num, algorithm == 'RVO')
             self.get_velocities = lambda: self.algorithm.compute_velocities(
-                    self.simulation.agents.positions,
-                    self.simulation.agents.velocities,
-                    self.simulation.agents.get_preferred_velocities(),
-                    self.simulation.agents.max_speeds,
-                    self.simulation.agents.velocity_diff_range,
-                    self.simulation.agents.radiuses,
-                    shoots_num=200
-                )
+                self.simulation.agents.positions,
+                self.simulation.agents.velocities,
+                self.simulation.agents.get_preferred_velocities(),
+                self.simulation.agents.max_speeds,
+                self.simulation.agents.velocity_diff_range,
+                self.simulation.agents.radiuses,
+                shoots_num=200
+            )
         else:
             raise Exception(f'{algorithm} is not in available algorithms')
 
@@ -109,11 +115,14 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         # observation
         obs = self.get_observations()
         # reward
-        distance = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
-        reward = -distance
+        reward = self.get_reward()
+
+        # check if agent is still on scene
+        out_of_bounds = any(0 > self.simulation.agents.positions[0]) or \
+                        any(self.simulation.agents.positions[0] > self.win_size)
 
         # observation, reward, done, info
-        return obs, reward, self.time > 10000, {}
+        return obs, reward, self.time > 10000 or out_of_bounds, {}
 
     def reset(self):
         self.time = 0
@@ -134,14 +143,27 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         super().close()
 
     def get_observations(self):
-        nearest_neighbours = self.simulation.agents.get_nearest_neighbours(self.visible_agents_num)[0]
-        visible_positions = self.simulation.agents.positions[nearest_neighbours]
-        visible_velocities = self.simulation.agents.velocities[nearest_neighbours]
+        nearest = self.simulation.agents.get_nearest_neighbours(self.visible_agents_num)[0]
+
+        visible_positions = self.simulation.agents.positions[nearest]
+        visible_velocities = self.simulation.agents.velocities[nearest]
         # assert all([all(a < b) for a, b in zip(visible_velocities, self.observation_space['velocity'].high)])
         return {
             'velocity': visible_velocities,
             'position': visible_positions,
+            'target': self.simulation.agents.targets[0]
         }
+
+    def get_reward(self):
+        nearest = self.simulation.agents.get_nearest_neighbours(1)
+
+        distance = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
+        reward = -distance
+
+        if self.simulation.is_colliding(0, nearest[0]):
+            reward -= self.collision_penalty
+
+        return reward
 
 
 if __name__ == '__main__':
