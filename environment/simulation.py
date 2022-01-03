@@ -69,7 +69,7 @@ class Simulation:
 
         nearest = self.agents.get_nearest_neighbours(1)
         for idx, (pos, neig) in enumerate(list(zip(self.agents.positions, nearest))):
-            neig = int(neig[0])
+            neig = neig[0]
             neighbour_pos = self.agents.positions[neig]
             if np.linalg.norm(pos - neighbour_pos) < self.agents.radiuses[idx] + self.agents.radiuses[neig]:
                 pg.draw.circle(

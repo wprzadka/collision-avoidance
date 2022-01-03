@@ -51,7 +51,7 @@ class Agents:
         self.targets = targets
 
     def get_nearest_neighbours(self, neighbours_num: int):
-        neighbours = np.empty((self.positions.shape[0], neighbours_num))
+        neighbours = np.empty((self.positions.shape[0], neighbours_num), dtype=int)
         for i, pos in enumerate(self.positions):
             # ignoring 1st result because it is always index of self
             _, indices = self.quadtree.query(pos, k=neighbours_num + 1)
