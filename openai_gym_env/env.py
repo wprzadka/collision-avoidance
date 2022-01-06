@@ -21,7 +21,9 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             visible_agents_num: int,
             max_speed: float,
             win_size: tuple = (1200, 900),
-            algorithm: str = None
+            algorithm: str = None,
+            distance_quantification: int = 5,
+            time_limit: int = 10000
     ):
         super(CollisionAvoidanceEnv, self).__init__()
 
@@ -57,6 +59,9 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.simulation = Simulation()
         self.initialize_simulation()
         self.time = 0
+        self.time_limit = time_limit
+        self.closest_reached_distance = None
+        self.distance_quantification = distance_quantification
         # rendering
         self.window = None
         # algorithm
@@ -115,18 +120,24 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         # observation
         obs = self.get_observations()
         # reward
-        reward = self.get_reward()
+        dist = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
+        reward = self.get_reward(distance=dist)
 
         # check if agent is still on scene
         out_of_bounds = any(0 > self.simulation.agents.positions[0]) or \
                         any(self.simulation.agents.positions[0] > self.win_size)
 
+        is_done = dist < np.finfo(float).eps or self.time > self.time_limit or out_of_bounds
+
         # observation, reward, done, info
-        return obs, reward, self.time > 10000 or out_of_bounds, {}
+        return obs, reward, is_done, {}
 
     def reset(self):
         self.time = 0
         self.initialize_simulation()
+        distance = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
+        # get multiplicity of distance quantification
+        self.closest_reached_distance = distance // self.distance_quantification * self.distance_quantification
         return self.get_observations()
 
     def render(self, mode='human', close=False):
@@ -154,16 +165,24 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             'target': self.simulation.agents.targets[0]
         }
 
-    def get_reward(self):
+    def get_reward(self, distance: float):
         nearest = self.simulation.agents.get_nearest_neighbours(1)
+        current_reward = -1  # time penalty
 
-        distance = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
-        reward = -distance
+        # reward for reaching goal
+        # if distance < np.finfo(np.float32).eps:
+        #     current_reward += 100
 
+        # reward for shortening distance to target
+        if distance < self.closest_reached_distance:
+            self.closest_reached_distance -= self.distance_quantification
+            current_reward += self.distance_quantification
+
+        # penalty for collisions
         if self.simulation.is_colliding(0, nearest[0]):
-            reward -= self.collision_penalty
+            current_reward -= self.collision_penalty
 
-        return reward
+        return current_reward
 
 
 if __name__ == '__main__':
