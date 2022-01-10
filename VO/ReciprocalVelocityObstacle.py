@@ -102,7 +102,7 @@ class ReciprocalVelocityObstacle:
                 preferred_velocity=preferred_velocities[idx],
                 accessible_velocities=accessible_vels,
                 radiuses=radiuses,
-                agent_idx=0
+                agent_idx=idx
             )
             new_velocities[idx] = accessible_vels[np.argmin(penalties)]
 
