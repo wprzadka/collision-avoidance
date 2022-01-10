@@ -119,7 +119,11 @@ if __name__ == '__main__':
         [140., 200.]
     ])
     sim.initialize(agents, targets)
-    rvo = ReciprocalVelocityObstacle(visible_agents_num=agents.agents_num)  # , reciprocal=True)
+    rvo = ReciprocalVelocityObstacle(
+        agents_num=agents_num,
+        visible_agents_num=3
+        # reciprocal=True
+    )
 
     sim.start()
     clock = pg.time.Clock()
@@ -140,6 +144,9 @@ if __name__ == '__main__':
             agents.max_speeds,
             agents.velocity_diff_range,
             agents.radiuses,
+            agents.get_nearest_neighbours(
+                rvo.visible_agents_num
+            ),
             shoots_num=200
         )
         rvo.draw_debug(window, agent_idx=agents.debug_agent)

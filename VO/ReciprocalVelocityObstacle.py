@@ -8,14 +8,18 @@ class ReciprocalVelocityObstacle:
 
     def __init__(
             self,
-            visible_agents_num: int,
+            agents_num: int,
+            visible_agents_num: int = None,
             reciprocal: bool = False
     ):
-        self.visible_agents_num = visible_agents_num
+        self.agents_num = agents_num
+        self.visible_agents_num = visible_agents_num or (agents_num - 1)
+        assert self.visible_agents_num < self.agents_num
+
         self.reciprocal = reciprocal
-        self.centers = np.empty([visible_agents_num, visible_agents_num - 1, 2])
-        self.left_boundaries = np.empty([visible_agents_num, visible_agents_num - 1, 2])
-        self.right_boundaries = np.empty([visible_agents_num, visible_agents_num - 1, 2])
+        self.centers = np.empty([self.agents_num, self.visible_agents_num, 2])
+        self.left_boundaries = np.empty([self.agents_num, self.visible_agents_num, 2])
+        self.right_boundaries = np.empty([self.agents_num, self.visible_agents_num, 2])
         self.left_normals = None
         self.right_normals = None
 
@@ -23,16 +27,17 @@ class ReciprocalVelocityObstacle:
             self,
             positions: np.ndarray,
             velocities: np.ndarray,
-            radiuses: np.ndarray
+            radiuses: np.ndarray,
+            nearest_neighbours: np.ndarray
     ):
         idx = 0
         while idx < radiuses.size:
             agent_pos = positions[idx]
             agent_vel = velocities[idx]
 
-            vels = np.delete(velocities, idx, axis=0)
-            rads = np.delete(radiuses, idx, axis=0) + radiuses[idx]
-            points = np.delete(positions, idx, axis=0)
+            vels = velocities[nearest_neighbours[idx]]
+            rads = radiuses[nearest_neighbours[idx]]
+            points = positions[nearest_neighbours[idx]]
 
             self.centers[idx] = agent_pos + (vels if not self.reciprocal else (vels + agent_vel) / 2)
             ref_points = agent_pos - points
@@ -78,9 +83,10 @@ class ReciprocalVelocityObstacle:
             max_speeds: np.ndarray,
             velocity_diff_range: np.ndarray,
             radiuses: np.ndarray,
+            nearest_neighbours: np.ndarray,
             shoots_num: int
     ):
-        self.compute_vo(positions, velocities, radiuses)
+        self.compute_vo(positions, velocities, radiuses, nearest_neighbours)
 
         new_velocities = np.empty_like(velocities)
         for idx, vel in enumerate(velocities):
@@ -124,7 +130,7 @@ class ReciprocalVelocityObstacle:
         # multiply by aggressiveness parameter weight
         # for a, b in zip(velocity_cost, 20 / time_to_collision):
         #     print(a, b)
-        return velocity_cost + 20 / time_to_collision
+        return velocity_cost + 40 / time_to_collision
 
     def compute_time_to_collision(
             self,
@@ -144,7 +150,7 @@ class ReciprocalVelocityObstacle:
         delta = np.square(b) - 4 * a * c
         if all(delta <= 0):
             return np.infty
-        return min(((-b - np.sqrt(delta)) / (2 * a))[delta > 0])
+        return min(((-b[delta > 0] - np.sqrt(delta[delta > 0])) / (2 * a[delta > 0])))
 
     def plot_debug_velocity(self, accessible_vels: np.ndarray):
         fig, ax = plt.subplots()
@@ -187,7 +193,8 @@ if __name__ == '__main__':
     rvo.compute_vo(
         np.array([[0, 0], [1, 2]]),
         np.array([[5, 2], [4, 3]]),
-        np.array([1, 1])
+        np.array([1, 1]),
+        np.array([[1], [0]])
     )
     rvo.compute_velocities(
         np.array([[0, 0], [1, 2]]),
@@ -196,5 +203,6 @@ if __name__ == '__main__':
         np.array([7, 7]),
         np.array([2, 2]),
         np.array([1, 1]),
+        np.array([[1], [0]]),
         1000
     )
