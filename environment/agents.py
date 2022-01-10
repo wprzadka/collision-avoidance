@@ -48,6 +48,7 @@ class Agents:
         return self.preferred_velocities
 
     def set_targets(self, targets: np.ndarray):
+        assert targets.shape == self.positions.shape
         self.targets = targets
 
     def get_nearest_neighbours(self, neighbours_num: int):
