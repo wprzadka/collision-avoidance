@@ -2,6 +2,7 @@ import numpy as np
 import pygame as pg
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
+from environment.agents import Agents
 
 
 class ReciprocalVelocityObstacle:
@@ -77,16 +78,18 @@ class ReciprocalVelocityObstacle:
 
     def compute_velocities(
             self,
-            positions: np.ndarray,
-            velocities: np.ndarray,
-            preferred_velocities: np.ndarray,
-            max_speeds: np.ndarray,
-            velocity_diff_range: np.ndarray,
-            radiuses: np.ndarray,
-            nearest_neighbours: np.ndarray,
+            agents: Agents,
             shoots_num: int
     ):
-        self.compute_vo(positions, velocities, radiuses, nearest_neighbours)
+        positions = agents.positions
+        velocities = agents.velocities
+        preferred_velocities = agents.get_preferred_velocities()
+        max_speeds = agents.max_speeds
+        velocity_diff_range = agents.velocity_diff_range
+        radii = agents.radiuses
+        nearest_neighbours = agents.get_nearest_neighbours(self.visible_agents_num)
+
+        self.compute_vo(positions, velocities, radii, nearest_neighbours)
 
         new_velocities = np.empty_like(velocities)
         for idx, vel in enumerate(velocities):
@@ -189,24 +192,3 @@ class ReciprocalVelocityObstacle:
         # plt.grid(True)
         # plt.savefig('shoots.png')
         return np.concatenate((xs.reshape((-1, 1)), ys.reshape((-1, 1))), axis=1)
-
-
-if __name__ == '__main__':
-    rvo = ReciprocalVelocityObstacle(2)
-    # print(rvo.generate_random_points(1000))
-    rvo.compute_vo(
-        np.array([[0, 0], [1, 2]]),
-        np.array([[5, 2], [4, 3]]),
-        np.array([1, 1]),
-        np.array([[1], [0]])
-    )
-    rvo.compute_velocities(
-        np.array([[0, 0], [1, 2]]),
-        np.array([[5, 2], [4, 3]]),
-        np.array([[5, 5], [6, 4]]),
-        np.array([7, 7]),
-        np.array([2, 2]),
-        np.array([1, 1]),
-        np.array([[1], [0]]),
-        1000
-    )

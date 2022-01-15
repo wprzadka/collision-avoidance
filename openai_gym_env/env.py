@@ -71,16 +71,12 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         if algorithm is None:
             self.get_velocities = self.simulation.agents.get_preferred_velocities
         elif algorithm in ['VO', 'RVO']:
-            self.algorithm = ReciprocalVelocityObstacle(self.agents_num, algorithm == 'RVO')
-            self.get_velocities = lambda: self.algorithm.compute_velocities(
-                self.simulation.agents.positions,
-                self.simulation.agents.velocities,
-                self.simulation.agents.get_preferred_velocities(),
-                self.simulation.agents.max_speeds,
-                self.simulation.agents.velocity_diff_range,
-                self.simulation.agents.radiuses,
-                shoots_num=200
+            self.algorithm = ReciprocalVelocityObstacle(
+                agents_num=self.agents_num,
+                visible_agents_num=visible_agents_num,
+                reciprocal=algorithm == 'RVO'
             )
+            self.get_velocities = lambda: self.algorithm.compute_velocities(self.simulation.agents, shoots_num=100)
         else:
             raise Exception(f'{algorithm} is not in available algorithms')
 
@@ -111,7 +107,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
     def step(self, action):
         self.time += 1
 
-        new_velocities = self.simulation.agents.get_preferred_velocities()
+        new_velocities = self.get_velocities()
         self.simulation.agents.set_velocity(new_velocities)
         # override 1st agent velocity with action
         self.simulation.agents.velocities[0] = action
@@ -189,7 +185,7 @@ if __name__ == '__main__':
     env = CollisionAvoidanceEnv(
         agents_num=20,
         visible_agents_num=3,
-        max_speed=4.,
+        max_speed=32.,
         algorithm='VO',
         win_size=(600, 600)
     )
