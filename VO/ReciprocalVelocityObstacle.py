@@ -31,7 +31,7 @@ class ReciprocalVelocityObstacle:
             nearest_neighbours: np.ndarray
     ):
         idx = 0
-        while idx < radiuses.size:
+        while idx < self.agents_num:
             agent_pos = positions[idx]
             agent_vel = velocities[idx]
 
@@ -150,21 +150,25 @@ class ReciprocalVelocityObstacle:
         delta = np.square(b) - 4 * a * c
         if all(delta <= 0):
             return np.infty
-        return min(((-b[delta > 0] - np.sqrt(delta[delta > 0])) / (2 * a[delta > 0])))
+        times = (-b[delta > 0] - np.sqrt(delta[delta > 0])) / (2 * a[delta > 0])
+        if all(times <= 0):
+            return np.infty
+        return min(times[times > 0])
 
-    def plot_debug_velocity(self, accessible_vels: np.ndarray):
+    def plot_debug_velocity(self, accessible_vels: np.ndarray, penalties: np.ndarray):
         fig, ax = plt.subplots()
 
         fig.size = (8, 8)
-        plt.xlim((np.min(accessible_vels[:, 0]), np.max(accessible_vels[:, 0])))
-        plt.ylim((np.min(accessible_vels[:, 1]), np.max(accessible_vels[:, 1])))
+        plt.xlim((np.min(accessible_vels[:, 0]) - 1, np.max(accessible_vels[:, 0]) + 1))
+        plt.ylim((np.min(accessible_vels[:, 1]) - 1, np.max(accessible_vels[:, 1]) + 1))
 
-        ax.scatter(accessible_vels[:, 0], accessible_vels[:, 1])
+        sc = ax.scatter(accessible_vels[:, 0], accessible_vels[:, 1], c=penalties)
+        plt.colorbar(sc)
 
-        for i, center in enumerate(self.centers):
+        for i, center in enumerate(self.centers[1:], 1):
             left = center + 10 * self.left_boundaries[i]
             right = center + 10 * self.right_boundaries[i]
-            p = Polygon(np.concatenate((center, left, right)), closed=True, color=(1, 0, 0, 0.2))
+            p = Polygon(np.concatenate((center, left, right)), closed=True, color=(1, 0, 0, 0.1))
             ax.add_patch(p)
 
         plt.grid(True)
