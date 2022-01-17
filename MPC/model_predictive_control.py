@@ -1,34 +1,45 @@
 import do_mpc
 import casadi
 import numpy as np
-from data_visualizer import DataVisualizer
 from matplotlib import rcParams
 import matplotlib.pyplot as plt
+from itertools import combinations
 
 
 class ModelPredictiveControl:
 
-    def __init__(self, visible_agents, time_step):
+    def __init__(
+            self,
+            visible_agents: int,
+            time_step: float,
+            own_target: np.ndarray,
+            max_speed: float,
+            desired_speed: float
+    ):
         self.time_step = time_step
+        self.visible_agents = visible_agents
 
-        self.own_target = casadi.SX(np.array([100, 500]))  #.reshape((2, 1)))
-        self.targets = casadi.SX(np.array([[2, 1]]))
+        self.own_target = casadi.SX(own_target)
+        # self.targets = casadi.SX(np.array([[2, 1]]))
 
-        self.model = self.create_model(visible_agents)
-        self.controller = self.create_controller()
+        self.model = self.create_model()
+        self.controller = self.create_controller(max_speed, desired_speed)
         self.estimator = do_mpc.estimator.StateFeedback(self.model)
         self.simulator = self.create_simulator()
 
         self.state = None
 
-    def create_model(self, visible_agents):
+    def create_model(self):
         model = do_mpc.model.Model('continuous')
         # states
         # pos = model.set_variable('_x', 'pos', shape=(visible_agents, 2))
         # vel = model.set_variable('_x', 'vel', shape=(visible_agents, 2))
-        own_pos = model.set_variable('_x', 'own_pos', shape=(2, 1))
-        # controls
-        own_vel = model.set_variable('_u', 'own_vel', shape=(2, 1))
+        own_pos = []
+        own_vel = []
+        for agent_idx in range(self.visible_agents):
+            own_pos.append(model.set_variable('_x', f'own_pos{agent_idx}', shape=(2, 1)))
+            # controls
+            own_vel.append(model.set_variable('_u', f'own_vel{agent_idx}', shape=(2, 1)))
 
         # uncertainty parameters
         # targ = model.set_variable('_p', 'targ', shape=(visible_agents, 2))
@@ -42,30 +53,71 @@ class ModelPredictiveControl:
 
         # model.set_rhs('vel', (self.targets - pos) * 0.5)
         # assert vel.shape == ((self.targets - pos) * 0.5).shape
-
-        model.set_rhs('own_pos', own_vel * self.time_step)
-        assert own_pos.shape == (own_vel * self.time_step).shape
+        for agent_idx in range(self.visible_agents):
+            model.set_rhs(f'own_pos{agent_idx}', own_vel[agent_idx] * self.time_step)
+            assert own_pos[agent_idx].shape == (own_vel[agent_idx] * self.time_step).shape
 
         model.setup()
         return model
 
-    def create_controller(self):
+    def create_controller(self, max_speed, desired_speed):
         m = self.model
         mpc = do_mpc.controller.MPC(m)
         # controller parameters
         params = {
-            'n_horizon': 4,
+            'n_horizon': 20,
             'n_robust': 1,
-            't_step': 0.1
+            't_step': self.time_step
         }
         mpc.set_param(**params)
         # objective = sum_over_time(lagrange_term + r_term) + meyer_term
+
+        # lterm=casadi.norm_2(1 / (m.x['own_pos'] - m.x['pos'])),
+        lterm = casadi.SX(0)  # casadi.norm_2(1 / (m.x['own_pos'] - casadi.SX(np.array([5, 5]))))
+        # for a, b in combinations(list(range(self.visible_agents))):
+        #     lterm +=
+
+        mterm = casadi.SX(0)
+        for agent_idx in range(self.visible_agents):
+            targ = self.own_target[agent_idx, :].T
+            mterm += casadi.norm_2(targ - m.x[f'own_pos{agent_idx}'])
+
         mpc.set_objective(
-            # lterm=casadi.norm_2(1 / (m.x['own_pos'] - m.x['pos'])),
-            lterm=casadi.norm_2(1 / (m.x['own_pos'] - casadi.SX(np.array([5, 5])))),
-            mterm=casadi.sum2(casadi.norm_2(self.own_target - m.x['own_pos']))
+            lterm=lterm,
+            mterm=mterm
         )
-        mpc.set_rterm(own_vel=000.1)  # input regularization
+        rterms = {f'own_vel{idx}': 1e-4 for idx in range(self.visible_agents)}
+        mpc.set_rterm(**rterms)  # input regularization
+
+        for agent_idx in range(self.visible_agents):
+            mpc.set_nl_cons(
+                f'speed_constraint_upper{agent_idx}',
+                casadi.sum2(m.u[f'own_vel{agent_idx}']**2),
+                ub=desired_speed**2,
+                soft_constraint=True,
+                maximum_violation=max_speed**2,
+                penalty_term_cons=1e-2
+            )
+        for a, b in combinations(list(range(self.visible_agents)), 2):
+            mpc.set_nl_cons(
+                f'collision_avoidance_constraint{a}/{b}',
+                -casadi.sum2((m.x[f'own_pos{a}'] - m.x[f'own_pos{b}']) ** 2),
+                ub=-(10 ** 2),
+                # soft_constraint=True,
+                # maximum_violation=max_speed ** 2,
+                # penalty_term_cons=1e-2
+            )
+            # mpc.set_nl_cons(
+            #     f'speed_constraint_lower{agent_idx}',
+            #     -m.u[f'own_vel{agent_idx}'],
+            #     ub=desired_speed,
+            #     soft_constraint=True,
+            #     maximum_violation=max_speed,
+            #     penalty_term_cons=0.05
+            # )
+
+        # mpc.bounds['upper', '_u', 'own_vel'] = 50
+        # mpc.bounds['lower', '_u', 'own_vel'] = -50
 
         mpc.setup()
         return mpc
@@ -81,11 +133,11 @@ class ModelPredictiveControl:
         simulator.setup()
         return simulator
 
-    def init_control_loop(self, pos, vel, own_pos):
+    def init_control_loop(self, own_pos):
         x0 = self.controller.x0
-        # x0['pos'] = pos
-        # x0['vel'] = vel
-        x0['own_pos'] = own_pos
+        x0['own_pos0'] = own_pos[0]
+        x0['own_pos1'] = own_pos[1]
+        x0['own_pos2'] = own_pos[2]
 
         self.controller.x0 = x0
         self.simulator.x0 = x0
@@ -104,11 +156,15 @@ class ModelPredictiveControl:
 
 if __name__ == '__main__':
 
-    mpc_model = ModelPredictiveControl(1, 0.1)
-    pos = np.array([100, 100])
-    vel = np.zeros(2)
-    own_pos = np.array([200, 250])
-    mpc_model.init_control_loop(pos=pos, vel=vel, own_pos=own_pos)
+    mpc_model = ModelPredictiveControl(
+        visible_agents=3,
+        time_step=0.1,
+        own_target=np.array([[0, 1], [150, 6], [10, 100]]),
+        max_speed=50.,
+        desired_speed=40.
+    )
+    own_pos = np.array([[200, 250], [100, 100], [200, 100]])
+    mpc_model.init_control_loop(own_pos=own_pos)
 
     # mpc_graphics = do_mpc.graphics.Graphics(mpc_model.controller.data)
     # sim_graphics = do_mpc.graphics.Graphics(mpc_model.simulator.data)
@@ -118,7 +174,7 @@ if __name__ == '__main__':
     # visualizer.create_figure()
 
     t = 0
-    while t < 600 and casadi.norm_2(mpc_model.state - mpc_model.own_target) > 0.1:
+    while t < 100:  # and casadi.norm_2(mpc_model.state - mpc_model.own_target) > 0.1:
         mpc_model.update_control_loop()
         # visualizer.update_plots(mpc_model.controller.data)
         t += 1
