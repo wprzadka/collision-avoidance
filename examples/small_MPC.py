@@ -1,4 +1,3 @@
-import casadi
 import pygame as pg
 import numpy as np
 
@@ -18,7 +17,6 @@ if __name__ == '__main__':
     pg.display.set_caption("Collision Avoidance")
 
     sim = Simulation()
-    # sim.random_initialize(scene_size=win_size, agents_num=10)
 
     agents_num = 3
     agents = Agents(
@@ -44,7 +42,8 @@ if __name__ == '__main__':
     model = ModelPredictiveControl(
         visible_agents=agents_num,
         time_step=delta_time,
-        own_target=agents.targets,
+        target=agents.targets,
+        radius=agents.radiuses,
         max_speed=agents.max_speeds[0],
         desired_speed=agents.desired_speeds[0]
     )
@@ -62,25 +61,12 @@ if __name__ == '__main__':
                 sim.running = False
 
         model.update_control_loop()
-        # new_velocities = agents.get_preferred_velocities()
-
-        # if casadi.norm_2(model.state - model.own_target) > 0.1:
-        # print(model.simulator.data['_u'][-1].reshape(-1, 2))
         new_velocities = model.simulator.data['_u'][-1].reshape(-1, 2)
-        # else:
-            # sim.running = False
-            # new_velocities[0] = np.zeros(2)
-
-        # new_velocities = model.compute_velocities(agents)
-        # model.draw_debug(window, agent_idx=agents.debug_agent)
-
-
         agents.set_velocity(new_velocities)
         agents.move(delta_time)
         model.state = agents.positions.reshape(-1, 1)
 
         sim.update(window)
-
         pg.display.update()
 
     rcParams['axes.grid'] = True
@@ -89,4 +75,4 @@ if __name__ == '__main__':
     fig, ax, graphics = do_mpc.graphics.default_plot(model.controller.data, figsize=(16, 9))
     graphics.plot_results()
     graphics.reset_axes()
-    plt.savefig('data.png')
+    plt.savefig('small_MPC_plots.png')
