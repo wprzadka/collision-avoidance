@@ -26,7 +26,7 @@ class Agents:
         self.quadtree = KDTree(self.positions)
 
     def move(self, delta_time: float):
-        self.positions = self.positions + self.velocities * delta_time
+        self.positions += self.velocities * delta_time
         # update quadtree
         self.quadtree = KDTree(self.positions)
 
