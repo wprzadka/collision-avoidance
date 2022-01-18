@@ -15,12 +15,19 @@ class ModelPredictiveControl:
             target: np.ndarray,
             radius: np.ndarray,
             max_speed: float,
-            desired_speed: float
+            desired_speed: float,
+            collision_cost_weight: float = 10.,
+            distance_cost_weight: float = 10.
     ):
+        # problem settings
         self.time_step = time_step
         self.visible_agents = visible_agents
         self.target = target
         self.radius = radius
+
+        # cost weights
+        self.coll_cw = collision_cost_weight
+        self.dist_cw = distance_cost_weight
 
         self.model = self.create_model()
         self.controller = self.create_controller(max_speed, desired_speed)
@@ -72,13 +79,14 @@ class ModelPredictiveControl:
         # keep distance to other agents
         lterm = casadi.SX(0)
         for a, b in combinations(list(range(self.visible_agents)), 2):
-            lterm += 10. / casadi.norm_2(m.x[f'pos{a}'] - m.x[f'pos{b}'])
+            rad_sum = self.radius[a] + self.radius[b]
+            lterm += self.coll_cw / (1 + casadi.exp(casadi.norm_2(m.x[f'pos{a}'] - m.x[f'pos{b}']) - rad_sum))
 
         # move over target
         mterm = casadi.SX(0)
         for agent_idx in range(self.visible_agents):
             targ = self.target[agent_idx]
-            mterm += casadi.norm_2(targ - m.x[f'pos{agent_idx}'])
+            mterm += self.dist_cw * casadi.norm_2(targ - m.x[f'pos{agent_idx}'])
 
         mpc.set_objective(
             lterm=lterm,
@@ -95,20 +103,20 @@ class ModelPredictiveControl:
                 ub=desired_speed ** 2,
                 soft_constraint=True,
                 maximum_violation=max_speed ** 2,
-                penalty_term_cons=1e-2
+                penalty_term_cons=1e-3
             )
 
         # constraint for collisions
-        for a, b in combinations(list(range(self.visible_agents)), 2):
-            rad_sum = self.radius[a] + self.radius[b]
-            mpc.set_nl_cons(
-                f'collision_avoidance_constraint{a}/{b}',
-                -casadi.sum2((m.x[f'pos{a}'] - m.x[f'pos{b}']) ** 2),
-                ub=-(rad_sum ** 2),
-                soft_constraint=True,
-                maximum_violation=(rad_sum / 2.) ** 2,
-                penalty_term_cons=1e-1
-             )
+        # for a, b in combinations(list(range(self.visible_agents)), 2):
+        #     rad_sum = self.radius[a] + self.radius[b]
+        #     mpc.set_nl_cons(
+        #         f'collision_avoidance_constraint{a}/{b}',
+        #         -casadi.sum2((m.x[f'pos{a}'] - m.x[f'pos{b}']) ** 2),
+        #         ub=-(rad_sum ** 2),
+        #         # soft_constraint=True,
+        #         # maximum_violation=(rad_sum / 2.) ** 2,
+        #         # penalty_term_cons=1e-1
+        #      )
 
         mpc.setup()
         return mpc
@@ -169,4 +177,4 @@ if __name__ == '__main__':
     fig, ax, graphics = do_mpc.graphics.default_plot(mpc_model.controller.data, figsize=(16, 9))
     graphics.plot_results()
     graphics.reset_axes()
-    plt.savefig('small_MPC_plots.png')
+    plt.savefig('data.png')
