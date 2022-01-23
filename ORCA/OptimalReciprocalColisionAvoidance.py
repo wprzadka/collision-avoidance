@@ -87,7 +87,6 @@ class ORCA:
                 self.line_point[idx, oth] = velocities[idx] + u[idx, oth] / 2.
                 self.line_point_translated[idx, oth] = self.line_point[idx, oth] + positions[idx]
 
-
     def compute_velocities(self, agents: Agents) -> np.ndarray:
         positions = agents.positions
         velocities = agents.velocities
@@ -112,8 +111,8 @@ class ORCA:
                 raise Exception("No solution")
                 # linear programming 3D
                 pass
-        for i in range(self.agents_num):
-            assert np.linalg.norm(agents.velocities[i]) < agents.max_speeds[i] + 0.00001
+        # for i in range(self.agents_num):
+            # assert np.linalg.norm(agents.velocities[i]) < agents.max_speeds[i] + 0.00001
         return new_vel
 
     def linear_prog_2d(
@@ -135,7 +134,7 @@ class ORCA:
                     best_vel = new_vel
                 else:
                     return best_vel, oth
-        assert np.linalg.norm(best_vel) < max_speed + 0.00001
+        # assert np.linalg.norm(best_vel) < max_speed + 0.00001
         return best_vel, 0
 
     def linear_prog_1d(
@@ -158,7 +157,6 @@ class ORCA:
                       np.dot(line_point[line_nr], line_point[line_nr])
 
         if discriminant < 0:
-            raise Exception("DUPA")
             return np.zeros(2), False
 
         # points of intersections
@@ -168,16 +166,12 @@ class ORCA:
         right = -coef_2b + determinantSqrt
         # a - term of equation equals 1
 
-        p_left = left
-        p_right = right
-
         for oth in range(line_nr):
 
             denominator = line_dir[line_nr, 0] * line_dir[oth, 1] - \
                           line_dir[line_nr, 1] * line_dir[oth, 0]
             if np.abs(denominator) < np.finfo(float).eps:
                 if np.dot(line_dir[line_nr], line_dir[oth]) < 0:
-                    raise Exception("DUPA")
                     return np.zeros(2), False
                 continue
 
@@ -201,9 +195,7 @@ class ORCA:
         t = max(t, left)
         t = min(t, right)
 
-        assert p_left <= t <= p_right
-        assert np.linalg.norm(line_point[line_nr] + t * line_dir[line_nr]) < max_speed + 0.00001
-
+        # assert np.linalg.norm(line_point[line_nr] + t * line_dir[line_nr]) < max_speed + 0.00001
         return line_point[line_nr] + t * line_dir[line_nr], True
 
     def draw_debug(self, win: pg.Surface, agent_idx: int):
