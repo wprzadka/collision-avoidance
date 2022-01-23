@@ -201,9 +201,7 @@ class ORCA:
     def draw_debug(self, win: pg.Surface, agent_idx: int):
 
         width = win.get_width()
-        i = 0
         for point, direction in zip(self.line_point_translated[agent_idx], self.line_dir[agent_idx]):
-            i += 100
             beg = point + ((0 - point[0]) / direction[0]) * direction
             end = point + ((width - point[0]) / direction[0]) * direction
-            pg.draw.line(win, (200., 200., i), beg, end)
+            pg.draw.line(win, (200., 200., 200.), beg, end)
