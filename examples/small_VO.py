@@ -51,7 +51,7 @@ if __name__ == '__main__':
             if event.type == pg.QUIT:
                 sim.running = False
 
-        new_velocities = rvo.compute_velocities(agents, shoots_num=100)
+        new_velocities = rvo.compute_velocities(agents)
         rvo.draw_debug(window, agent_idx=agents.debug_agent)
 
         # print(agents.get_preferred_velocities() - new_velocities)

@@ -11,13 +11,16 @@ class ReciprocalVelocityObstacle:
             self,
             agents_num: int,
             visible_agents_num: int = None,
-            reciprocal: bool = False
+            reciprocal: bool = False,
+            shoots_num: int = 200
     ):
         self.agents_num = agents_num
         self.visible_agents_num = visible_agents_num or (agents_num - 1)
         assert self.visible_agents_num < self.agents_num
 
         self.reciprocal = reciprocal
+        self.shoots_num = shoots_num
+
         self.centers = np.empty([self.agents_num, self.visible_agents_num, 2])
         self.left_boundaries = np.empty([self.agents_num, self.visible_agents_num, 2])
         self.right_boundaries = np.empty([self.agents_num, self.visible_agents_num, 2])
@@ -78,8 +81,7 @@ class ReciprocalVelocityObstacle:
 
     def compute_velocities(
             self,
-            agents: Agents,
-            shoots_num: int
+            agents: Agents
     ):
         positions = agents.positions
         velocities = agents.velocities
@@ -93,7 +95,7 @@ class ReciprocalVelocityObstacle:
 
         new_velocities = np.empty_like(velocities)
         for idx, vel in enumerate(velocities):
-            points = self.generate_random_points(shoots_num)
+            points = self.generate_random_points()
             accessible_vels = vel + points * velocity_diff_range[idx]
 
             speeds = np.linalg.norm(accessible_vels, axis=1)
@@ -104,7 +106,7 @@ class ReciprocalVelocityObstacle:
                 velocities=velocities,
                 preferred_velocity=preferred_velocities[idx],
                 accessible_velocities=accessible_vels,
-                radiuses=radiuses,
+                radiuses=radii,
                 agent_idx=idx
             )
             new_velocities[idx] = accessible_vels[np.argmin(penalties)]
@@ -177,12 +179,9 @@ class ReciprocalVelocityObstacle:
         plt.grid(True)
         plt.savefig('shoots.png')
 
-    def generate_random_points(
-            self,
-            shoots_num: int
-    ):
-        rads = np.sqrt(np.random.rand(shoots_num))
-        alphas = np.random.rand(shoots_num) * 2 * np.pi
+    def generate_random_points(self):
+        rads = np.sqrt(np.random.rand(self.shoots_num))
+        alphas = np.random.rand(self.shoots_num) * 2 * np.pi
 
         xs = np.cos(alphas) * rads
         ys = np.sin(alphas) * rads

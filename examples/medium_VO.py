@@ -4,7 +4,7 @@ import numpy as np
 from environment.simulation import Simulation
 from environment.agents import Agents
 from VO.ReciprocalVelocityObstacle import ReciprocalVelocityObstacle
-
+from ORCA.OptimalReciprocalColisionAvoidance import ORCA
 
 if __name__ == '__main__':
 
@@ -48,10 +48,11 @@ if __name__ == '__main__':
         [200., 100.],
     ])
     sim.initialize(agents, targets)
-    rvo = ReciprocalVelocityObstacle(
+    model = ReciprocalVelocityObstacle(
         agents_num=agents_num,
         visible_agents_num=3
-        # reciprocal=True
+        # reciprocal=True,
+        # shoots_num=100
     )
 
     sim.start()
@@ -66,8 +67,8 @@ if __name__ == '__main__':
             if event.type == pg.QUIT:
                 sim.running = False
 
-        new_velocities = rvo.compute_velocities(agents, shoots_num=100)
-        rvo.draw_debug(window, agent_idx=agents.debug_agent)
+        new_velocities = model.compute_velocities(agents)
+        model.draw_debug(window, agent_idx=agents.debug_agent)
 
         # print(agents.get_preferred_velocities() - new_velocities)
         agents.set_velocity(new_velocities)

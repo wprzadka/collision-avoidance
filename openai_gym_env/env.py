@@ -76,7 +76,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
                 visible_agents_num=visible_agents_num,
                 reciprocal=algorithm == 'RVO'
             )
-            self.get_velocities = lambda: self.algorithm.compute_velocities(self.simulation.agents, shoots_num=100)
+            self.get_velocities = lambda: self.algorithm.compute_velocities(self.simulation.agents)
         else:
             raise Exception(f'{algorithm} is not in available algorithms')
 
