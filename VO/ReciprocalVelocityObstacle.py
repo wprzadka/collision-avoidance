@@ -3,6 +3,7 @@ import pygame as pg
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from environment.agents import Agents
+from utilities.math_utils import det2d
 
 
 class ReciprocalVelocityObstacle:
@@ -107,6 +108,7 @@ class ReciprocalVelocityObstacle:
                 preferred_velocity=preferred_velocities[idx],
                 accessible_velocities=accessible_vels,
                 radiuses=radii,
+                nearest=nearest_neighbours,
                 agent_idx=idx
             )
             new_velocities[idx] = accessible_vels[np.argmin(penalties)]
@@ -121,15 +123,17 @@ class ReciprocalVelocityObstacle:
             preferred_velocity: np.ndarray,
             accessible_velocities: np.ndarray,
             radiuses: np.ndarray,
+            nearest: np.ndarray,
             agent_idx: int
     ):
         velocity_cost = np.linalg.norm(preferred_velocity - accessible_velocities, axis=1)
         time_to_collision = np.array([
             self.compute_time_to_collision(
-                new_velocity=vel,
                 positions=positions,
-                velocities=velocities,
+                relative_vels=(2 * vel - velocities[agent_idx] if self.reciprocal else vel)
+                              - velocities[nearest[agent_idx]],
                 rads=radiuses,
+                nearest=nearest[agent_idx],
                 agent_idx=agent_idx
             ) for vel in accessible_velocities])
         # multiply by aggressiveness parameter weight
@@ -139,26 +143,29 @@ class ReciprocalVelocityObstacle:
 
     def compute_time_to_collision(
             self,
-            new_velocity: np.ndarray,
             positions: np.ndarray,
-            velocities: np.ndarray,
+            relative_vels: np.ndarray,
             rads: np.ndarray,
+            nearest: np.ndarray,
             agent_idx: int
     ) -> float:
-        pos_diff = positions[agent_idx] - np.delete(positions, agent_idx, axis=0)
-        vel_diff = new_velocity - np.delete(velocities, agent_idx, axis=0)
-        c = np.sum(np.square(pos_diff), axis=1) - \
-            np.square(rads[agent_idx] + np.delete(rads, agent_idx, axis=0)).flatten()
-        b = 2 * np.sum(pos_diff * vel_diff, axis=1)
-        a = np.sum(np.square(vel_diff), axis=1)
+        pos_diff = positions[nearest] - positions[agent_idx]
+        rad_sum = (rads[agent_idx] + rads[nearest]).flatten()
+        rad_sum_sq = rad_sum ** 2
 
-        delta = np.square(b) - 4 * a * c
-        if all(delta <= 0):
-            return np.infty
-        times = (-b[delta > 0] - np.sqrt(delta[delta > 0])) / (2 * a[delta > 0])
-        if all(times <= 0):
-            return np.infty
-        return min(times[times > 0])
+        c_times = np.empty(nearest.size)
+
+        det = np.array([det2d(v, p) for v, p in zip(relative_vels, pos_diff)])
+        vel_dot = np.sum(relative_vels ** 2, axis=1)
+        # discriminant of quadratic equation which lower solutions us time of collision with other agent
+        # and upper solution is time when collision finishes
+        discriminant = -(det ** 2) + rad_sum_sq * vel_dot
+        for i, d_val in enumerate(discriminant):
+            if d_val > 0:
+                c_times[i] = (np.dot(relative_vels[i], pos_diff[i]) - np.sqrt(d_val)) / vel_dot[i]
+            if d_val < 0 or c_times[i] < 0:
+                c_times[i] = float("inf")
+        return np.min(c_times)
 
     def plot_debug_velocity(self, accessible_vels: np.ndarray, penalties: np.ndarray):
         fig, ax = plt.subplots()
