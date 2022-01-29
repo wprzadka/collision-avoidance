@@ -8,11 +8,12 @@ import pygame as pg
 from environment.simulation import Simulation
 from environment.agents import Agents
 from VO.ReciprocalVelocityObstacle import ReciprocalVelocityObstacle
+from ORCA.OptimalReciprocalColisionAvoidance import ORCA
 
 
 class CollisionAvoidanceEnv(gym.Env, ABC):
     metadata = {'render.modes': ['human']}
-    available_algorithms = [None, 'VO', 'RVO']
+    available_algorithms = [None, 'VO', 'RVO', 'ORCA']
     collision_penalty = 100.
 
     def __init__(
@@ -23,7 +24,8 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             win_size: tuple = (1200, 900),
             algorithm: str = None,
             distance_quantification: int = 5,
-            time_limit: int = 10000
+            time_step: float = 0.25,
+            time_limit: int = 1000
     ):
         super(CollisionAvoidanceEnv, self).__init__()
 
@@ -59,6 +61,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.simulation = Simulation()
         self.initialize_simulation()
         self.time = 0
+        self.time_step = time_step
         self.time_limit = time_limit
         self.closest_reached_distance = None
         self.distance_quantification = distance_quantification
@@ -75,6 +78,14 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
                 agents_num=self.agents_num,
                 visible_agents_num=visible_agents_num,
                 reciprocal=algorithm == 'RVO'
+            )
+            self.get_velocities = lambda: self.algorithm.compute_velocities(self.simulation.agents)
+        elif algorithm == 'ORCA':
+            self.algorithm = ORCA(
+                agents_num=self.agents_num,
+                visible_agents_num=visible_agents_num,
+                time_step=time_step,
+                time_horizon=20 * time_step
             )
             self.get_velocities = lambda: self.algorithm.compute_velocities(self.simulation.agents)
         else:
@@ -105,13 +116,13 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.simulation.initialize(agents, targets)
 
     def step(self, action):
-        self.time += 1
+        self.time += self.time_step
 
         new_velocities = self.get_velocities()
         self.simulation.agents.set_velocity(new_velocities)
         # override 1st agent velocity with action
         self.simulation.agents.velocities[0] = action
-        self.simulation.agents.move(0.01)
+        self.simulation.agents.move(self.time_step)
 
         # observation
         obs = self.get_observations()
