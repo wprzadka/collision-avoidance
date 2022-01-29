@@ -15,7 +15,7 @@ if __name__ == '__main__':
     sim = Simulation()
     # sim.random_initialize(scene_size=win_size, agents_num=10)
 
-    agents_num = 20
+    agents_num = 50
     positions = np.empty((agents_num, 2))
     targets = np.empty((agents_num, 2))
     for i in range(agents_num):
@@ -24,29 +24,35 @@ if __name__ == '__main__':
         targets[i] = -positions[i]
         positions[i] += win_size / 2
         targets[i] += win_size / 2
+    targets += np.random.random((agents_num, 2))
 
     agents = Agents(
         agents_num=agents_num,
         positions=positions,
-        radiuses=np.full((agents_num, 1), 10),
-        max_speeds=np.full((agents_num, 1), 40.),
-        desired_speeds=np.full((agents_num, 1), 30.),
-        velocity_diff_range=np.full((agents_num, 1), 10.)
+        radiuses=np.full((agents_num, 1), 10.),
+        max_speeds=np.full((agents_num, 1), 1.),
+        desired_speeds=np.full((agents_num, 1), 0.75),
+        velocity_diff_range=np.full((agents_num, 1), 1.)
     )
     sim.initialize(agents, targets)
-    model = ReciprocalVelocityObstacle(
+
+    delta_time = 0.5
+
+    model = ORCA(
         agents_num=agents_num,
-        visible_agents_num=3,
-        reciprocal=True,
-        shoots_num=100
+        visible_agents_num=5,
+        time_step=delta_time,
+        time_horizon=10.
     )
 
     sim.start()
     clock = pg.time.Clock()
 
-    delta_time = 1 / 60.
+    new_velocities = model.compute_velocities(agents)
+    agents.set_velocity(new_velocities)
+
     while sim.running:
-        clock.tick(60)
+        clock.tick(30)
         window.fill((60, 60, 60))
 
         for event in pg.event.get():

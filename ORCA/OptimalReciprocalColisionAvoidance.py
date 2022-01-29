@@ -12,11 +12,15 @@ class ORCA:
             self,
             agents_num: int,
             visible_agents_num: int = None,
-            time_horizon: float = 1.
+            time_step: float = 0.25,
+            time_horizon: float = 10.
     ):
         self.agents_num = agents_num
         self.visible_agents_num = visible_agents_num or self.agents_num - 1
         self.time_horizon = time_horizon
+        self.inv_time_horizon = 1 / self.time_horizon
+        self.time_step = time_step
+        self.inv_time_step = 1 / self.time_step
 
         self.line_point = np.empty((self.agents_num, self.visible_agents_num, 2))
         self.line_point_translated = np.empty((self.agents_num, self.visible_agents_num, 2))
@@ -29,7 +33,8 @@ class ORCA:
             radii: np.ndarray,
             nearest: np.ndarray
     ):
-        for idx in range(len(positions)):
+
+        for idx in range(positions.shape[0]):
             rel_vel = velocities[idx] - velocities[nearest[idx]]
             rel_pos = positions[nearest[idx]] - positions[idx]
             dist_sq = np.sum(rel_pos ** 2, axis=1)
@@ -43,7 +48,7 @@ class ORCA:
                     # no collision occurred
 
                     # difference between relative velocity and minimal velocity that leads to positions equality
-                    vel_diff = rel_vel[oth] - rel_pos[oth] / self.time_horizon
+                    vel_diff = rel_vel[oth] - rel_pos[oth] * self.inv_time_horizon
                     vel_diff_mag = np.linalg.norm(vel_diff)
                     # side relative to cone direction
                     side_dir = np.dot(vel_diff, rel_pos[oth])
@@ -53,14 +58,13 @@ class ORCA:
 
                         vel_diff_normalized = vel_diff / vel_diff_mag
 
-                        u[idx, oth] = vel_diff_normalized * (rad_sum[oth] / self.time_horizon - vel_diff_mag)
+                        u[idx, oth] = vel_diff_normalized * (rad_sum[oth] * self.inv_time_horizon - vel_diff_mag)
                         # right parallel vector to vel_diff (v.y, -v.x)
                         self.line_dir[idx, oth] = np.array([vel_diff_normalized[1], -vel_diff_normalized[0]])
                     else:
                         # projection on cone edges
 
-                        # det = np.linalg.det(rel_pos, vel_diff)
-                        det = rel_pos[oth, 0] * vel_diff[1] - rel_pos[oth, 1] * vel_diff[0]
+                        det = self.det2d(rel_pos[oth], vel_diff)
                         leg = np.sqrt(dist_sq[oth] - rad_sum_sq[oth])
 
                         if det > 0:
@@ -80,7 +84,12 @@ class ORCA:
                         u[idx, oth] = dot * self.line_dir[idx][oth] - rel_vel[oth]
                 else:
                     # collision occurred
-                    pass
+                    vel_diff = rel_vel[oth] - rel_pos[oth] * self.inv_time_step
+                    vel_diff_mag = np.linalg.norm(vel_diff)
+                    vel_diff_normalized = vel_diff / vel_diff_mag
+
+                    self.line_dir[idx, oth] = np.array([vel_diff_normalized[1], -vel_diff_normalized[0]])
+                    u[idx, oth] = (rad_sum[oth] * self.inv_time_step - vel_diff_mag) * vel_diff_normalized
 
             # for idx in range(self.agents_num):
             for oth in range(self.visible_agents_num):
@@ -99,54 +108,129 @@ class ORCA:
         new_vel = np.empty_like(pref_vel)
 
         for idx in range(self.agents_num):
-            temp_vel, fails_count = self.linear_prog_2d(
+            temp_vel, failed_at = self.linear_prog_2d(
                 agents.max_speeds[idx],
                 pref_vel[idx],
                 idx
             )
 
-            if fails_count == 0:
+            if failed_at == self.line_point.shape[1]:
                 new_vel[idx] = temp_vel
             else:
-                raise Exception("No solution")
-                # linear programming 3D
-                pass
+                # linear programming in 2D failed
+                new_vel[idx] = self.linear_prog_3d(
+                    agents.max_speeds[idx],
+                    idx,
+                    failed_at,
+                    temp_vel
+                )
+
         # for i in range(self.agents_num):
             # assert np.linalg.norm(agents.velocities[i]) < agents.max_speeds[i] + 0.00001
         return new_vel
+
+    def linear_prog_3d(
+            self,
+            max_speed: float,
+            agent_idx: int,
+            line_nr: int,
+            curr_velocity: np.ndarray
+    ) -> np.ndarray:
+
+        line_point = self.line_point[agent_idx]
+        line_dir = self.line_dir[agent_idx]
+
+        distance = 0.0
+        for curr_line in range(line_nr, line_point.shape[0]):
+            vel_displacement = line_point[curr_line] - curr_velocity
+            det = self.det2d(line_dir[curr_line], vel_displacement)
+            if det < distance:
+                # velocity satisfies current line constraint
+                continue
+            # weaken the constraints due to make it able to satisfy
+            temp_line_point = np.empty((curr_line, 2))
+            temp_line_dir = np.empty((curr_line, 2))
+
+            for j in range(0, curr_line):
+                det = self.det2d(line_dir[curr_line], line_dir[j])
+                if np.abs(det) < np.finfo(float).eps:
+                    # lines are parallel
+                    if np.dot(line_dir[curr_line], line_dir[j]) > 0:
+                        # directions are this same
+                        continue
+                    else:
+                        temp_line_point[j] = 0.5 * (line_point[j] + line_point[curr_line])
+                else:
+                    temp_line_point[j] = line_point[curr_line] + \
+                                         line_dir[curr_line] * \
+                                         (self.det2d(line_dir[j], line_point[curr_line] - line_point[j]) / det)
+
+                dir_diff = line_dir[j] - line_dir[curr_line]
+                temp_line_dir[j] = dir_diff / np.linalg.norm(dir_diff)
+
+            # self.line_dir[agent_idx, :curr_line] = temp_line_dir
+            # self.line_point[agent_idx, :curr_line] = temp_line_point
+
+            pref_velocity = np.array([-line_dir[curr_line, 1], line_dir[curr_line, 0]])
+            curr_velocity, _ = self.linear_prog_2d(
+                max_speed,
+                pref_velocity,
+                agent_idx,
+                temp_line_point,
+                temp_line_dir,
+                optimize_dir=True
+            )
+            distance = self.det2d(line_dir[curr_line], line_point[curr_line] - curr_velocity)
+        return curr_velocity
 
     def linear_prog_2d(
             self,
             max_speed: float,
             pref_vel: np.ndarray,
-            agent_idx: int
+            agent_idx: int,
+            line_point: np.ndarray = None,
+            line_dir: np.ndarray = None,
+            optimize_dir: bool = False
     ) -> Tuple[np.ndarray, int]:
-        best_vel = pref_vel
+        if not optimize_dir:
+            best_vel = pref_vel
+        else:
+            pref_vel_mag = np.linalg.norm(pref_vel)
+            best_vel = pref_vel / pref_vel_mag * max_speed
 
-        for oth in range(self.visible_agents_num):
-            vel_displacement = self.line_point[agent_idx, oth] - best_vel
-            det = self.line_dir[agent_idx, oth][0] * vel_displacement[1] - \
-                  self.line_dir[agent_idx, oth][1] * vel_displacement[0]
+        if line_point is None:
+            line_point = self.line_point[agent_idx]
+        if line_dir is None:
+            line_dir = self.line_dir[agent_idx]
+
+        for oth in range(line_point.shape[0]):
+            vel_displacement = line_point[oth] - best_vel
+            det = self.det2d(line_dir[oth], vel_displacement)
             if det > 0:
                 # constraint is violated
-                new_vel, succeed = self.linear_prog_1d(max_speed, pref_vel, agent_idx, line_nr=oth)
+                new_vel, succeed = self.linear_prog_1d(max_speed, pref_vel, agent_idx, line_nr=oth, optimize_dir=optimize_dir)
                 if succeed:
                     best_vel = new_vel
                 else:
                     return best_vel, oth
         # assert np.linalg.norm(best_vel) < max_speed + 0.00001
-        return best_vel, 0
+        return best_vel, self.visible_agents_num
 
     def linear_prog_1d(
             self,
             max_speed: float,
             pref_vel: np.ndarray,
             agent_idx: int,
-            line_nr: int
+            line_nr: int,
+            line_point: np.ndarray = None,
+            line_dir: np.ndarray = None,
+            optimize_dir: bool = False
     ) -> Tuple[np.ndarray, bool]:
 
-        line_dir = self.line_dir[agent_idx]
-        line_point = self.line_point[agent_idx]
+        if line_dir is None:
+            line_dir = self.line_dir[agent_idx]
+        if line_point is None:
+            line_point = self.line_point[agent_idx]
 
         # check if intersection of velocities satisfying the max speed condition and ORCA line constraint is not null
         # with discriminant of quadratic equation that is looking for points of intersections between max speed circle
@@ -168,8 +252,7 @@ class ORCA:
 
         for oth in range(line_nr):
 
-            denominator = line_dir[line_nr, 0] * line_dir[oth, 1] - \
-                          line_dir[line_nr, 1] * line_dir[oth, 0]
+            denominator = self.det2d(line_dir[line_nr], line_dir[oth])
             if np.abs(denominator) < np.finfo(float).eps:
                 if np.dot(line_dir[line_nr], line_dir[oth]) < 0:
                     return np.zeros(2), False
@@ -189,19 +272,32 @@ class ORCA:
             if left > right:
                 return np.zeros(2), False
 
-        t = np.dot(line_dir[line_nr], pref_vel - line_point[line_nr])
+        if not optimize_dir:
+            t = np.dot(line_dir[line_nr], pref_vel - line_point[line_nr])
 
-        # cut t in constraints
-        t = max(t, left)
-        t = min(t, right)
+            # cut t in constraints
+            t = max(t, left)
+            t = min(t, right)
 
-        # assert np.linalg.norm(line_point[line_nr] + t * line_dir[line_nr]) < max_speed + 0.00001
-        return line_point[line_nr] + t * line_dir[line_nr], True
+            # assert np.linalg.norm(line_point[line_nr] + t * line_dir[line_nr]) < max_speed + 0.00001
+            return line_point[line_nr] + t * line_dir[line_nr], True
+        else:
+            # optimize direction
+            if np.dot(pref_vel, line_dir[line_nr]) > 0.:
+                return line_point[line_nr] + right * line_dir[line_nr], True
+            else:
+                return line_point[line_nr] + left * line_dir[line_nr], True
+
+    @staticmethod
+    def det2d(fst: np.ndarray, snd: np.ndarray) -> float:
+        return fst[0] * snd[1] - fst[1] * snd[0]
 
     def draw_debug(self, win: pg.Surface, agent_idx: int):
 
-        width = win.get_width()
+        # width = win.get_width()
         for point, direction in zip(self.line_point_translated[agent_idx], self.line_dir[agent_idx]):
-            beg = point + ((0 - point[0]) / direction[0]) * direction
-            end = point + ((width - point[0]) / direction[0]) * direction
+            # beg = point + ((0 - point[0]) / direction[0]) * direction
+            # end = point + ((width - point[0]) / direction[0]) * direction
+            beg = point - 1000 * direction
+            end = point + 1000 * direction
             pg.draw.line(win, (200., 200., 200.), beg, end)
