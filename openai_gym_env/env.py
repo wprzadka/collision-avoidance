@@ -26,7 +26,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             algorithm: str = None,
             distance_quantification: int = 5,
             time_step: float = 0.25,
-            time_limit: int = 1000
+            time_limit: int = 100
     ):
         super(CollisionAvoidanceEnv, self).__init__()
 
@@ -130,9 +130,10 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.time += self.time_step
 
         new_velocities = self.get_velocities()
-        self.simulation.agents.set_velocity(new_velocities)
         # override 1st agent velocity with action
-        self.simulation.agents.velocities[0] = action * self.max_agents_speed
+        new_velocities[0] = action * self.max_agents_speed
+
+        self.simulation.agents.set_velocity(new_velocities)
         self.simulation.agents.move(self.time_step)
 
         # observation
