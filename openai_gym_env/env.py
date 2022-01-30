@@ -37,20 +37,30 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
 
         self.action_space = spaces.Box(
             shape=(2,),
-            low=-max_speed,
-            high=max_speed
+            low=-1,
+            high=1
         )
 
         self.observation_space = spaces.Dict({
-            'velocity': spaces.Box(
-                shape=(visible_agents_num, 2),
+            'velocity_x': spaces.Box(
+                shape=(visible_agents_num,),
                 low=-max_speed,
                 high=max_speed
             ),
-            'position': spaces.Box(
-                shape=(visible_agents_num, 2),
-                low=np.zeros((visible_agents_num, 2)),
-                high=np.full((visible_agents_num, 2), fill_value=self.win_size)
+            'velocity_y': spaces.Box(
+                shape=(visible_agents_num,),
+                low=-max_speed,
+                high=max_speed
+            ),
+            'position_x': spaces.Box(
+                shape=(visible_agents_num,),
+                low=0,
+                high=self.win_size[0]
+            ),
+            'position_y': spaces.Box(
+                shape=(visible_agents_num,),
+                low=0,
+                high=self.win_size[1]
             ),
             'target': spaces.Box(
                 shape=(2,),
@@ -122,7 +132,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         new_velocities = self.get_velocities()
         self.simulation.agents.set_velocity(new_velocities)
         # override 1st agent velocity with action
-        self.simulation.agents.velocities[0] = action
+        self.simulation.agents.velocities[0] = action * self.max_agents_speed
         self.simulation.agents.move(self.time_step)
 
         # observation
@@ -170,8 +180,10 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         visible_velocities = self.simulation.agents.velocities[nearest]
         # assert all([all(a < b) for a, b in zip(visible_velocities, self.observation_space['velocity'].high)])
         return {
-            'velocity': visible_velocities,
-            'position': visible_positions,
+            'velocity_x': visible_velocities[:, 0],
+            'velocity_y': visible_velocities[:, 1],
+            'position_x': visible_positions[:, 0],
+            'position_y': visible_positions[:, 1],
             'target': self.simulation.agents.targets[0]
         }
 
