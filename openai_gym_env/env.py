@@ -15,6 +15,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
     metadata = {'render.modes': ['human']}
     available_algorithms = [None, 'VO', 'RVO', 'ORCA']
     collision_penalty = 100.
+    out_of_bounds_penalty = 10_000.
 
     def __init__(
             self,
@@ -133,6 +134,8 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         # check if agent is still on scene
         out_of_bounds = any(0 > self.simulation.agents.positions[0]) or \
                         any(self.simulation.agents.positions[0] > self.win_size)
+        if out_of_bounds:
+            reward -= self.out_of_bounds_penalty
 
         is_done = dist < np.finfo(float).eps or self.time > self.time_limit or out_of_bounds
 
