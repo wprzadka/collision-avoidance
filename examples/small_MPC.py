@@ -39,18 +39,31 @@ if __name__ == '__main__':
     sim.initialize(agents, targets)
 
     delta_time = 1 / 60.
-    model = ModelPredictiveControl(
-        visible_agents=agents_num,
-        time_step=delta_time,
-        target=agents.targets,
-        radius=agents.radiuses,
-        max_speed=agents.max_speeds[0],
-        desired_speed=agents.desired_speeds[0]
-    )
-    model.init_control_loop(agents.positions)
+    models = []
+    for i in range(agents_num):
+        model = ModelPredictiveControl(
+            visible_agents=agents_num-1,
+            time_step=delta_time,
+            target=agents.targets[i],
+            radius=agents.radiuses,
+            max_speed=agents.max_speeds[i],
+            desired_speed=agents.desired_speeds[i]
+        )
+        model.init_control_loop(agents.positions[i])
+        model.set_agent_states(
+            positions=np.delete(agents.positions, i, axis=0),
+            velocities=np.delete(agents.velocities, i, axis=0)
+        )
+        models.append(model)
 
     sim.start()
     clock = pg.time.Clock()
+
+    paused = True
+
+    keys = pg.key.get_pressed()
+    if keys[pg.K_SPACE]:
+        paused = False
 
     while sim.running:
         clock.tick(60)
@@ -59,12 +72,25 @@ if __name__ == '__main__':
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 sim.running = False
+        keys = pg.key.get_pressed()
+        if keys[pg.K_SPACE]:
+            paused = False
 
-        model.update_control_loop()
-        new_velocities = model.simulator.data['_u'][-1].reshape(-1, 2)
-        agents.set_velocity(new_velocities)
-        agents.move(delta_time)
-        model.state = agents.positions.reshape(-1, 1)
+        if not paused:
+            new_velocities = np.empty_like(agents.velocities)
+            for i, model in enumerate(models):
+                model.set_agent_states(
+                    positions=np.delete(agents.positions, i, axis=0),
+                    velocities=np.delete(agents.velocities, i, axis=0)
+                )
+                model.update_control_loop()
+                new_velocities[i] = model.simulator.data['_u'][-1]
+
+            agents.set_velocity(new_velocities)
+            agents.move(delta_time)
+
+            for i, model in enumerate(models):
+                model.state = agents.positions[i]
 
         sim.update(window)
         pg.display.update()
@@ -72,7 +98,8 @@ if __name__ == '__main__':
     rcParams['axes.grid'] = True
     rcParams['font.size'] = 18
 
-    fig, ax, graphics = do_mpc.graphics.default_plot(model.controller.data, figsize=(16, 9))
-    graphics.plot_results()
-    graphics.reset_axes()
-    plt.savefig('small_MPC_plots.png')
+    for i, model in enumerate(models):
+        fig, ax, graphics = do_mpc.graphics.default_plot(model.controller.data, figsize=(16, 9))
+        graphics.plot_results()
+        graphics.reset_axes()
+        plt.savefig(f'small_MPC_plots{i}.png')
