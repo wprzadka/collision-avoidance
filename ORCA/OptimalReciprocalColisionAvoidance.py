@@ -4,6 +4,7 @@ import pygame.draw
 from typing import Tuple
 
 from environment.agents import Agents
+from utilities.math_utils import det2d
 
 
 class ORCA:
@@ -64,7 +65,7 @@ class ORCA:
                     else:
                         # projection on cone edges
 
-                        det = self.det2d(rel_pos[oth], vel_diff)
+                        det = det2d(rel_pos[oth], vel_diff)
                         leg = np.sqrt(dist_sq[oth] - rad_sum_sq[oth])
 
                         if det > 0:
@@ -143,7 +144,7 @@ class ORCA:
         distance = 0.0
         for curr_line in range(line_nr, line_point.shape[0]):
             vel_displacement = line_point[curr_line] - curr_velocity
-            det = self.det2d(line_dir[curr_line], vel_displacement)
+            det = det2d(line_dir[curr_line], vel_displacement)
             if det < distance:
                 # velocity satisfies current line constraint
                 continue
@@ -152,7 +153,7 @@ class ORCA:
             temp_line_dir = np.empty((curr_line, 2))
 
             for j in range(0, curr_line):
-                det = self.det2d(line_dir[curr_line], line_dir[j])
+                det = det2d(line_dir[curr_line], line_dir[j])
                 if np.abs(det) < np.finfo(float).eps:
                     # lines are parallel
                     if np.dot(line_dir[curr_line], line_dir[j]) > 0:
@@ -163,7 +164,7 @@ class ORCA:
                 else:
                     temp_line_point[j] = line_point[curr_line] + \
                                          line_dir[curr_line] * \
-                                         (self.det2d(line_dir[j], line_point[curr_line] - line_point[j]) / det)
+                                         (det2d(line_dir[j], line_point[curr_line] - line_point[j]) / det)
 
                 dir_diff = line_dir[j] - line_dir[curr_line]
                 temp_line_dir[j] = dir_diff / np.linalg.norm(dir_diff)
@@ -180,7 +181,7 @@ class ORCA:
                 temp_line_dir,
                 optimize_dir=True
             )
-            distance = self.det2d(line_dir[curr_line], line_point[curr_line] - curr_velocity)
+            distance = det2d(line_dir[curr_line], line_point[curr_line] - curr_velocity)
         return curr_velocity
 
     def linear_prog_2d(
@@ -205,7 +206,7 @@ class ORCA:
 
         for oth in range(line_point.shape[0]):
             vel_displacement = line_point[oth] - best_vel
-            det = self.det2d(line_dir[oth], vel_displacement)
+            det = det2d(line_dir[oth], vel_displacement)
             if det > 0:
                 # constraint is violated
                 new_vel, succeed = self.linear_prog_1d(max_speed, pref_vel, agent_idx, line_nr=oth, optimize_dir=optimize_dir)
@@ -252,7 +253,7 @@ class ORCA:
 
         for oth in range(line_nr):
 
-            denominator = self.det2d(line_dir[line_nr], line_dir[oth])
+            denominator = det2d(line_dir[line_nr], line_dir[oth])
             if np.abs(denominator) < np.finfo(float).eps:
                 if np.dot(line_dir[line_nr], line_dir[oth]) < 0:
                     return np.zeros(2), False
@@ -287,10 +288,6 @@ class ORCA:
                 return line_point[line_nr] + right * line_dir[line_nr], True
             else:
                 return line_point[line_nr] + left * line_dir[line_nr], True
-
-    @staticmethod
-    def det2d(fst: np.ndarray, snd: np.ndarray) -> float:
-        return fst[0] * snd[1] - fst[1] * snd[0]
 
     def draw_debug(self, win: pg.Surface, agent_idx: int):
 
