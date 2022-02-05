@@ -81,5 +81,5 @@ class Simulation:
                 )
 
     def is_colliding(self, fst: int, snd: int) -> bool:
-        return np.linalg.norm(self.agents.positions[fst] - self.agents.positions[snd]) \
-               < self.agents.radiuses[fst] + self.agents.radiuses[snd]
+        return (np.linalg.norm(self.agents.positions[fst] - self.agents.positions[snd])
+                < self.agents.radiuses[fst] + self.agents.radiuses[snd])[0]
