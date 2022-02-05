@@ -16,6 +16,8 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
     available_algorithms = [None, 'VO', 'RVO', 'ORCA']
     collision_penalty = 100.
     out_of_bounds_penalty = 10_000.
+    distance_reward = 20.
+    goal_reward = 500.
 
     def __init__(
             self,
@@ -193,13 +195,13 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         current_reward = -1  # time penalty
 
         # reward for reaching goal
-        # if distance < np.finfo(np.float32).eps:
-        #     current_reward += 100
+        if distance < np.finfo(np.float32).eps:
+            current_reward += self.goal_reward
 
         # reward for shortening distance to target
         if distance < self.closest_reached_distance:
             self.closest_reached_distance -= self.distance_quantification
-            current_reward += self.distance_quantification
+            current_reward += self.distance_reward * self.distance_quantification
 
         # penalty for collisions
         if self.simulation.is_colliding(0, nearest[0]):
