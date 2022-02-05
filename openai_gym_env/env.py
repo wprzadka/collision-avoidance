@@ -68,6 +68,11 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
                 shape=(2,),
                 low=np.zeros(2),
                 high=np.array(self.win_size)
+            ),
+            'self_position': spaces.Box(
+                shape=(2,),
+                low=np.zeros(2),
+                high=np.array(self.win_size)
             )
         })
         # simulation
@@ -187,7 +192,8 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             'velocity_y': visible_velocities[:, 1],
             'position_x': visible_positions[:, 0],
             'position_y': visible_positions[:, 1],
-            'target': self.simulation.agents.targets[0]
+            'target': self.simulation.agents.targets[0],
+            'self_position': self.simulation.agents.positions[0]
         }
 
     def get_reward(self, distance: float):
