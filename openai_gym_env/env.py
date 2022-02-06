@@ -17,7 +17,10 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
     collision_penalty = 100.
     out_of_bounds_penalty = 10_000.
     distance_reward = 20.
+    direction_reward = 5.
     goal_reward = 500.
+
+    goal_eps = 0.1
 
     def __init__(
             self,
@@ -81,11 +84,10 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.time = 0
         self.time_step = time_step
         self.time_limit = time_limit
-        # self.closest_reached_distance = None
-        # self.reached_quants = None
-        self.initial_distance = None
 
+        self.closest_reached_distance = None
         self.distance_quantification = distance_quantification
+
         # rendering
         self.window = None
         # algorithm
@@ -158,7 +160,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         if out_of_bounds:
             reward -= self.out_of_bounds_penalty
 
-        is_done = dist < np.finfo(float).eps or self.time > self.time_limit or out_of_bounds
+        is_done = dist < self.goal_eps or self.time > self.time_limit or out_of_bounds
 
         # observation, reward, done, info
         return obs, reward, is_done, {}
@@ -168,9 +170,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.initialize_simulation()
         distance = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
         # get multiplicity of distance quantification
-        # self.closest_reached_distance = distance // self.distance_quantification * self.distance_quantification
-        # self.reached_quants = 0
-        self.initial_distance = distance
+        self.closest_reached_distance = distance // self.distance_quantification * self.distance_quantification
         return self.get_observations()
 
     def render(self, mode='human', close=False):
@@ -209,14 +209,17 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         if distance < np.finfo(np.float32).eps:
             current_reward += self.goal_reward
 
-        # reward for shortening distance to target
-        # if distance < self.closest_reached_distance:
-        #     self.closest_reached_distance -= self.distance_quantification
-        #     self.reached_quants += 1
-        # current_reward += self.distance_reward * self.distance_quantification * self.reached_quants
-        # print(f'{self.reached_quants} -> {self.distance_reward * self.distance_quantification * self.reached_quants}')
-        current_reward += self.distance_reward * (self.initial_distance - distance)
-        # print(self.distance_reward * (self.initial_distance - distance))
+        # reward for shortening distance to target (quantified)
+        if distance < self.closest_reached_distance:
+            self.closest_reached_distance -= self.distance_quantification
+            current_reward += self.distance_reward * self.distance_quantification
+
+        # reward for correct velocity vector
+        direction = self.simulation.agents.targets[0] - self.simulation.agents.positions[0]
+        direction /= np.linalg.norm(direction)
+        velocity = self.simulation.agents.velocities[0]
+        velocity /= np.linalg.norm(velocity)
+        current_reward += self.direction_reward * np.dot(velocity, direction)
 
         # penalty for collisions
         if self.simulation.is_colliding(0, nearest[0]):
