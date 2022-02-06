@@ -81,7 +81,10 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.time = 0
         self.time_step = time_step
         self.time_limit = time_limit
-        self.closest_reached_distance = None
+        # self.closest_reached_distance = None
+        # self.reached_quants = None
+        self.initial_distance = None
+
         self.distance_quantification = distance_quantification
         # rendering
         self.window = None
@@ -165,7 +168,9 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         self.initialize_simulation()
         distance = np.linalg.norm(self.simulation.agents.positions[0] - self.simulation.agents.targets[0])
         # get multiplicity of distance quantification
-        self.closest_reached_distance = distance // self.distance_quantification * self.distance_quantification
+        # self.closest_reached_distance = distance // self.distance_quantification * self.distance_quantification
+        # self.reached_quants = 0
+        self.initial_distance = distance
         return self.get_observations()
 
     def render(self, mode='human', close=False):
@@ -205,9 +210,13 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
             current_reward += self.goal_reward
 
         # reward for shortening distance to target
-        if distance < self.closest_reached_distance:
-            self.closest_reached_distance -= self.distance_quantification
-            current_reward += self.distance_reward * self.distance_quantification
+        # if distance < self.closest_reached_distance:
+        #     self.closest_reached_distance -= self.distance_quantification
+        #     self.reached_quants += 1
+        # current_reward += self.distance_reward * self.distance_quantification * self.reached_quants
+        # print(f'{self.reached_quants} -> {self.distance_reward * self.distance_quantification * self.reached_quants}')
+        current_reward += self.distance_reward * (self.initial_distance - distance)
+        # print(self.distance_reward * (self.initial_distance - distance))
 
         # penalty for collisions
         if self.simulation.is_colliding(0, nearest[0]):
