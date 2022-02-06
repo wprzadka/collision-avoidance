@@ -206,7 +206,7 @@ class CollisionAvoidanceEnv(gym.Env, ABC):
         current_reward = -1  # time penalty
 
         # reward for reaching goal
-        if distance < np.finfo(np.float32).eps:
+        if distance < self.goal_eps:
             current_reward += self.goal_reward
 
         # reward for shortening distance to target (quantified)
